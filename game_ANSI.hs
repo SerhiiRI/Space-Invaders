@@ -20,7 +20,7 @@ parseWindow (Nothing) = 0
 
 -- You may add X argumnet and line to rendering
 -- TODO: create spcefic data type to each of types
-makingBashPointRow ::  Int -> String -> IO ()
+makingBashPointRow :: Int -> String -> IO ()
 makingBashPointRow x_position line = do
   ANSI.setCursorPosition 40 x_position
   putStrLn line
@@ -41,14 +41,14 @@ mainLoopIO = do
   pointOnWindows <- fmap read getLine                   -- geting left right code 
   let bliat = returnInWidth (parseWindow widthOfWindows) pointOnWindows
   --mapM_ putStrLn userShip
-  --makingBashPointRow bliat userShips
+  mapM_ (makingBashPointRow bliat) userShip
   mainLoopIO
 
 
 
 returnInWidth :: Int -> Int -> Int
 returnInWidth width getPositionX
-        | getPositionX > width          = width
+        | getPositionX > width          = width - 10
         | getPositionX < 1              = 1
         | otherwise                     = getPositionX
 
