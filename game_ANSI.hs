@@ -38,7 +38,7 @@ makingBashPointRow x_position line = do
 mainLoopIO :: IO Int
 mainLoopIO = do
   widthOfWindows <- size                                -- geting windows size
-  pointOnWindows <- fmap read getLine                   -- geting left right code 
+  pointOnWindows <- fmap read getLine                   -- geting left right code
   let bliat = returnInWidth (parseWindow widthOfWindows) pointOnWindows
   --mapM_ putStrLn userShip
   mapM_ (makingBashPointRow bliat) userShip
