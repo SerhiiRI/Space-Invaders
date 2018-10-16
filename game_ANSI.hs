@@ -2,84 +2,73 @@
 import System.Console.ANSI as ANSI
 import System.Console.Terminal.Size
 import System.IO
+import Control.Exception
 
 
--- userShip, provides as a test, in real situation:
--- TODO: creating User Ships must be procedural in the separate module
+type CurrentCoordinate = Int
+data Dimension = Dimension { height :: Int
+                           , width :: Int
+                           } deriving (Show)
+
+data Coordinate = Coordinate { x :: Int
+                             , y :: Int
+                             } deriving (Show)
+
+
+
 userShip :: [String]
-userShip = [ "    /#\\    ", " \\ / | \\ / ", " /\\\\ | //\\ " ,"    - -    " ]
+userShip = [ "     /#\\     ", "  \\ / | \\ /  ", "  /\\\\ | //\\  " ,"     - -     " ]
 
-
--- parsing window for geting windows width char size
--- TODO: change geting tuple for geting demention
--- using for parsing "size" command library:
----- System.Console.Terminal.Size
-parseWindow :: (Integral n) => Maybe (Window n) -> n
-parseWindow (Just (Window {height = h, width = w})) = w
-parseWindow (Nothing) = 0
+parseWindow :: (Integral n) => Maybe (Window n) -> Dimension
+parseWindow (Just (Window {height = h, width = w})) = Dimension {height=h, width=w}
+parseWindow (Nothing) = Dimension {height=0, width=0}
 
 
 -- You may add X argumnet and line to rendering
 -- TODO: create spcefic data type to each of types
-makingBashPointRow :: Int -> Int -> [String] -> IO ()
-makingBashPointRow y_position x_position (x:xs) = do
+makingBashPointRow :: Coordinate -> [String] -> IO ()
+makingBashPointRow (Coordinate {x=y_position, y=x_position}) (x:xs) = do
   ANSI.setCursorPosition y_position x_position
   putStrLn x
   makingBashPointRow (y_position+1) x_position xs
 makingBashPointRow y_position x_position [] = do
   ANSI.setCursorPosition y_position x_position
 
-
-
-
-getValue :: Int -> Char -> Maybe Int
-getValue value 'a' = Just (value - 1)
-getValue value 'd' = Just (value + 2)
-getValue value _ = Nothing
-
-
-
-
-
+{-
 ifReadyDo :: Handle -> IO a -> IO (Maybe a)
 ifReadyDo hnd x = hReady hnd >>= f
    where f True = x >>= return . Just
          f _    = return Nothing
+-}
+
+returnInWidth :: Dimension -> Coordinate -> Char -> Coordinate
+returnInWidth (Dimension {height=hei, width=wid}) (Coordinate {x=x1,y=y1}) myChar
+        | myChar == 'a'   = inDimension (Coordinate {x=(x1-2), y=y1})
+        | myChar == 'd'   = inDimension (Coordinate {x=(x1+2), y=y1})
+        | myChar == 'w'   = inDimension (Coordinate {x=x1, y=y1})
+        | myChar == 's'   = inDimension (Coordinate {x=x1, y=y1})
+        | otherwise       = (Coordinate {x=x1, y=y1})
+        where inDimension (Coordinate {x=newX, y=newY})
+              | (newX) > 0 && (newX+10) < wid = (Coordinate newX y1)
+              | otherwise = (Coordinate {x=x1, y=y1})
 
 
-
-
-
-returnInWidth :: Int -> Maybe Int -> Int
-returnInWidth width Nothing = width
-returnInWidth width (Just getPositionX)
-        | getPositionX > width          = width - 11
-        | getPositionX < 0              = 1
-        | otherwise                     = getPositionX
-
-
-
-
-
--- Infinite loop for main function
--- Function get kode symbol XB86_* and
--- render `userShip` in spectial parsing point
-mainLoopIO :: Int -> IO Int
-mainLoopIO xv = do
-  widthOfWindows <- parseWindow <$> size                        -- widthOfWindows = 69 :: IO
-  pointOnWindows <- fmap (getValue xv) getChar                  -- 
-  let xPoint = returnInWidth widthOfWindows pointOnWindows
-  --mapM_ putStrLn userShip
-  --mapM_ (makingBashPointRow xPoint) userShip
-  makingBashPointRow 50 xPoint userShip
-  mainLoopIO xv
+mainLoopIO :: Coordinate -> IO Int
+mainLoopIO currentPosition = do
+  windowDimension        <- parseWindow <$> size
+  hFlush stdout
+  old                    <- hGetEcho stdin
+  kb_01                  <- bracket_ (hSetEcho stdin False) (hSetEcho stdin old) getChar
+  let changedWindowsPointCoordinate = returnInWidth windowDimension currentPosition kb_01
+  makingBashPointRow changedWindowsPointCoordinate userShip
+  mainLoopIO changeWidowsPointCoordinate
 
 
 main = do
-  putStr ANSI.hideCursorCode
-  let xCoordinate = 30
-  mainLoopIO 30
-  putStr ANSI.showCursorCode
+  --putStr ANSI.hideCursorCode
+  let xCoordinate = (Coordinate {x=1, y=15})
+  mainLoopIO xCoordinate
+  --putStr ANSI.showCursorCode
 
 
 
