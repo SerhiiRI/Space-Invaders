@@ -15,9 +15,8 @@ userShip :: [String]
 userShip = [ "     /#\\     ", "  \\ / | \\ /  ", "  /\\\\ | //\\  " ,"     - -     " ]
 
 parseWindow :: Maybe (Window Int) -> Dimension.Dimension
-parseWindow (Just (Window {height = h, width = w})) = (Dimension.Dimension {height=h, width=w})
-parseWindow (Nothing) = Dimension.Dimension {height=0, width=0}
-
+parseWindow (Just (Window {height = h, width = w})) = (Dimension.Dimension {Dimension.height=h, Dimension.width=w})
+parseWindow (Nothing) = (Dimension.Dimension {Dimension.height=0, Dimension.width=0})
 
 -- You may add X argumnet and line to rendering
 -- TODO: create spcefic data type to each of types
@@ -35,7 +34,7 @@ ifReadyDo hnd x = hReady hnd >>= f
          f _    = return Nothing
 
 returnInWidth :: Dimension.Dimension -> Point.Point -> Maybe Char -> Point.Point
-returnInWidth (Dimension.Dimension {height=xhei, width=xwid}) (Point.Point {Point.x=x1, Point.y=y1}) myChar
+returnInWidth (Dimension.Dimension {Dimension.height=xhei, Dimension.width=xwid}) (Point.Point {Point.x=x1, Point.y=y1}) myChar
         | myChar == Just 'a'   = inDimension (Point.Point {Point.x=(x1-2), Point.y=y1})
         | myChar == Just 'd'   = inDimension (Point.Point {Point.x=(x1+2), Point.y=y1})
         | myChar == Nothing    = inDimension (Point.Point x1 y1)
@@ -66,4 +65,5 @@ main = do
   mainLoopIO windowDimension xPoint
   putStr ANSI.showCursorCode
   where
-    genr (Dimension.Dimension{height=xheight, width=xwidth}) = (Point.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
+    genr ( Dimension.Dimension {Dimension.height=xheight, Dimension.width=xwidth}) = (Point.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
+
