@@ -4,55 +4,45 @@ import System.Console.Terminal.Size
 import System.IO
 import System.Posix.Unistd
 import Control.Exception
-import qualified Library.Point as Point
-import qualified Library.Dimension as Dimension
+import qualified Library.Vector         as Vector
+import qualified Library.Ships          as Ships
 
-type CurrentPoint = Int
 
-newtype Bullet = Bullet { getBullet :: (Int, Int) }
-
-userShip :: [String]
-userShip = [ "     /#\\     ", "  \\ / | \\ /  ", "  /\\\\ | //\\  " ,"     - -     " ]
-
-parseWindow :: Maybe (Window Int) -> Dimension.Dimension
-parseWindow (Just (Window {height = h, width = w})) = (Dimension.Dimension {Dimension.height=h, Dimension.width=w})
-parseWindow (Nothing) = (Dimension.Dimension {Dimension.height=0, Dimension.width=0})
-
--- You may add X argumnet and line to rendering
--- TODO: create spcefic data type to each of types
-makingBashPointRow :: Point.Point -> [String] -> IO ()
-makingBashPointRow (Point.Point x_position y_position) (x:xs) = do
-  ANSI.setCursorPosition y_position x_position
-  putStrLn x
-  makingBashPointRow (Point.Point x_position (y_position+1)) xs
-makingBashPointRow (Point.Point x_position y_position) [] = do
-  ANSI.setCursorPosition y_position x_position
 
 ifReadyDo :: Handle -> IO a -> IO (Maybe a)
 ifReadyDo hnd x = hReady hnd >>= f
    where f True = x >>= return . Just
          f _    = return Nothing
 
-returnInWidth :: Dimension.Dimension -> Point.Point -> Maybe Char -> Point.Point
-returnInWidth (Dimension.Dimension {Dimension.height=xhei, Dimension.width=xwid}) (Point.Point {Point.x=x1, Point.y=y1}) myChar
-        | myChar == Just 'a'   = inDimension (Point.Point {Point.x=(x1-2), Point.y=y1})
-        | myChar == Just 'd'   = inDimension (Point.Point {Point.x=(x1+2), Point.y=y1})
-        | myChar == Nothing    = inDimension (Point.Point x1 y1)
-        | otherwise       = (Point.Point {Point.x=x1, Point.y=y1})
-        where inDimension (Point.Point newX newY) = if ((newX) > -2) && ((newX+10) < xwid) then (Point.Point newX y1) else (Point.Point x1 y1)
 
+returnInWidth' :: Vector.Dimension -> Maybe Char -> Ships.GamerShip -> Maybe Ships.GamerShip
+returnInWidth' (Vector.Dimension xhei xwid) myChar gamerShip
+        | myChar == Just 'a'   = Just ( (Ships.point gamerShip) `inSection` (subtract 2))
+        | myChar == Just 'd'   = Just ( (Ships.point gamerShip) `inSection` (+2))
+        | myChar == Nothing    = Just ( (Ships.point gamerShip) `inSection` (id))
+        | otherwise            = Nothing
+        where
+          inSection (Vector.Point newX newY) xFun = gamerShip { Ships.point = (
+                                                                  if ((xFun $ newX) > -2) && (((xFun $ newX)+10) < xwid)
+                                                                  then (Vector.Point (xFun newX) newY)
+                                                                  else (Vector.Point newX newY)
+                                                                  )
+                                                              }
 
-mainLoopIO :: Dimension.Dimension -> Point.Point -> IO ()
-mainLoopIO windowDimension currentPosition = do
+mainLoopIO :: Vector.Dimension -> Maybe Ships.GamerShip -> IO ()
+mainLoopIO _ Nothing = putStrLn "ERROR"
+mainLoopIO windowDimension userShip = do
+  -- IO functionality
   hFlush stdout
-
-  --kb_01                  <- bracket_ (hSetEcho stdin False) (hSetEcho stdin old) ifReadyDo
-
   char <- ifReadyDo stdin getChar -- (bracket_ (hSetEcho stdin False) (hSetEcho stdin old) getChar)
-  let changedWindowsPoint = returnInWidth windowDimension currentPosition char
-  makingBashPointRow changedWindowsPoint userShip
+
+  let newShip = userShip >>= (returnInWidth' windowDimension char)
+  -- let usrShip = returnInWidth' windowDimension char userShip
+  Ships.renderShip' newShip
+
   usleep 5000
-  mainLoopIO windowDimension changedWindowsPoint
+  mainLoopIO windowDimension newShip
+
 
 
 main = do
@@ -60,10 +50,17 @@ main = do
   ANSI.clearScreen
   old                    <- hGetEcho stdin
   hSetEcho stdin False
-  windowDimension        <- parseWindow <$> size
-  let xPoint = genr windowDimension
-  mainLoopIO windowDimension xPoint
+  windowDimension        <- Vector.parseWindow <$> size
+  let userShips = Just Ships.GamerShip {
+        Ships.point             = genr windowDimension
+        , Ships.viewShip        = Ships.defaultUserShip
+        , Ships.shipSprite      = Ships.defaultUserSprite
+        , Ships.viewBullet        = Ships.defaultBulletView
+        , Ships.bullets         = []
+        , Ships.lifes           = Just 3
+        }
+  mainLoopIO windowDimension userShips
   putStr ANSI.showCursorCode
   where
-    genr ( Dimension.Dimension {Dimension.height=xheight, Dimension.width=xwidth}) = (Point.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
+    genr ( Vector.Dimension {Vector.height=xheight, Vector.width=xwidth}) = (Vector.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
 
