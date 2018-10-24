@@ -15,12 +15,13 @@ ifReadyDo hnd x = hReady hnd >>= f
          f _    = return Nothing
 
 
-returnInWidth' :: Vector.Dimension -> Maybe Char -> Ships.GamerShip -> Maybe Ships.GamerShip
-returnInWidth' (Vector.Dimension xhei xwid) myChar gamerShip
+keyboardController :: Vector.Dimension -> Maybe Char -> Ships.GamerShip -> Maybe Ships.GamerShip
+keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
         | myChar == Just 'a'   = Just ( (Ships.point gamerShip) `inSection` (subtract 2))
         | myChar == Just 'd'   = Just ( (Ships.point gamerShip) `inSection` (+2))
         | myChar == Nothing    = Just ( (Ships.point gamerShip) `inSection` (id))
-        | otherwise            = Nothing
+        | myChar == Just 'j'   = Ships.addBulletStack gamerShip
+        | otherwise            = Just ( (Ships.point gamerShip) `inSection` (id))
         where
           inSection (Vector.Point newX newY) xFun = gamerShip { Ships.point = (
                                                                   if ((xFun $ newX) > -2) && (((xFun $ newX)+10) < xwid)
@@ -29,6 +30,7 @@ returnInWidth' (Vector.Dimension xhei xwid) myChar gamerShip
                                                                   )
                                                               }
 
+
 mainLoopIO :: Vector.Dimension -> Maybe Ships.GamerShip -> IO ()
 mainLoopIO _ Nothing = putStrLn "ERROR"
 mainLoopIO windowDimension userShip = do
@@ -36,11 +38,15 @@ mainLoopIO windowDimension userShip = do
   hFlush stdout
   char <- ifReadyDo stdin getChar -- (bracket_ (hSetEcho stdin False) (hSetEcho stdin old) getChar)
 
-  let newShip = userShip >>= (returnInWidth' windowDimension char)
-  -- let usrShip = returnInWidth' windowDimension char userShip
-  Ships.renderShip' newShip
-
-  usleep 5000
+  let newShip =
+        userShip
+        >>= (keyboardController windowDimension char)
+        >>= Ships.runAndCleanBullet
+  Ships.renderShipM             newShip
+  Ships.renderBulletsM          newShip
+  Ships.renderBulletCountM      newShip
+  Ships.renderLifeCountM        newShip windowDimension
+  usleep 10000
   mainLoopIO windowDimension newShip
 
 
@@ -55,12 +61,20 @@ main = do
         Ships.point             = genr windowDimension
         , Ships.viewShip        = Ships.defaultUserShip
         , Ships.shipSprite      = Ships.defaultUserSprite
-        , Ships.viewBullet        = Ships.defaultBulletView
+        , Ships.viewBullet      = Ships.defaultBulletView
         , Ships.bullets         = []
         , Ships.lifes           = Just 3
         }
-  mainLoopIO windowDimension userShips
-  putStr ANSI.showCursorCode
+  catch (mainLoopIO windowDimension userShips) handler
+  putStrLn ANSI.showCursorCode
+  --ANSI.clearScreen
+  --putStr "\ESC[2J"
+  putStr ANSI.clearFromCursorToScreenBeginningCode
+  putStr ANSI.clearFromCursorToScreenEndCode
+
+  ANSI.setCursorPosition 0 0
   where
     genr ( Vector.Dimension {Vector.height=xheight, Vector.width=xwidth}) = (Vector.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
+    handler :: SomeException -> IO ()
+    handler e = putStrLn $ ANSI.showCursorCode
 

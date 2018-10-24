@@ -5,6 +5,7 @@ module Library.Vector
   , renderOnPoint
 )where
 
+
 import System.Console.ANSI as ANSI
 import qualified System.Console.Terminal.Size as Size
 
@@ -20,8 +21,6 @@ renderOnPoint (Point x_position y_position) (x:xs) = do
   renderOnPoint (Point x_position (y_position+1)) xs
 renderOnPoint (Point x_position y_position) [] = do
   ANSI.setCursorPosition y_position x_position
-
-
 
 
 parseWindow :: Maybe (Size.Window Int) -> Dimension
