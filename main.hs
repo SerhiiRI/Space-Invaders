@@ -15,7 +15,7 @@ ifReadyDo hnd x = hReady hnd >>= f
          f _    = return Nothing
 
 
-keyboardController :: Vector.Dimension -> Maybe Char -> Ships.GamerShip -> Maybe Ships.GamerShip
+keyboardController :: Vector.Dimension -> Maybe Char -> Ships.Ship -> Maybe Ships.Ship
 keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
         | myChar == Just 'a'   = Just ( (Ships.point gamerShip) `inSection` (subtract 2))
         | myChar == Just 'd'   = Just ( (Ships.point gamerShip) `inSection` (+2))
@@ -31,9 +31,10 @@ keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
                                                               }
 
 
-mainLoopIO :: Vector.Dimension -> Maybe Ships.GamerShip -> IO ()
-mainLoopIO _ Nothing = putStrLn "ERROR"
-mainLoopIO windowDimension userShip = do
+
+mainLoopIO :: Vector.Dimension -> Maybe Ships.Ship -> [[Ships.Ship]] -> IO ()
+mainLoopIO _ Nothing _ = putStrLn "ERROR"
+mainLoopIO windowDimension userShip enemyShips = do
   -- IO functionality
   hFlush stdout
   char <- ifReadyDo stdin getChar -- (bracket_ (hSetEcho stdin False) (hSetEcho stdin old) getChar)
@@ -41,23 +42,33 @@ mainLoopIO windowDimension userShip = do
   let newShip =
         userShip
         >>= (keyboardController windowDimension char)
+        -- TODO: >>= Ships.killedByEnemyBullet enemyShips
         >>= Ships.runAndCleanBullet
+  {- TODO: implement all this function
+  let newEnemyShips =
+        enemyShips
+        >>= Ships.killedByUserBullet newShip
+        >>= Ships.moveEnemyShips
+        >>= Ships.runAndCleanBullet
+  -}
   Ships.renderShipM             newShip
   Ships.renderBulletsM          newShip
   Ships.renderBulletCountM      newShip
   Ships.renderLifeCountM        newShip windowDimension
+  Ships.renderAllEnemyShips     enemyShips --newEnemyShips
+  -- TODO: Ships.renderAllEnemyBullets   newEnemyShips
   usleep 10000
-  mainLoopIO windowDimension newShip
 
-
+  mainLoopIO windowDimension newShip enemyShips
 
 main = do
   putStr ANSI.hideCursorCode
   ANSI.clearScreen
   old                    <- hGetEcho stdin
   hSetEcho stdin False
+
   windowDimension        <- Vector.parseWindow <$> size
-  let userShips = Just Ships.GamerShip {
+  let userShips = Just Ships.Ship {
         Ships.point             = genr windowDimension
         , Ships.viewShip        = Ships.defaultUserShip
         , Ships.shipSprite      = Ships.defaultUserSprite
@@ -65,8 +76,10 @@ main = do
         , Ships.bullets         = []
         , Ships.lifes           = Just 3
         }
-  catch (mainLoopIO windowDimension userShips) handler
+  let enemyMatrix = Ships.createEnemyShipTemplate windowDimension
+  catch (mainLoopIO windowDimension userShips enemyMatrix) handler
   putStrLn ANSI.showCursorCode
+
   --ANSI.clearScreen
   --putStr "\ESC[2J"
   putStr ANSI.clearFromCursorToScreenBeginningCode
