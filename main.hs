@@ -6,6 +6,7 @@ import System.Posix.Unistd
 import Control.Exception
 import qualified Library.Vector         as Vector
 import qualified Library.Ships          as Ships
+import qualified System.Random          as Random (StdGen, mkStdGen, randomR)
 
 
 
@@ -32,34 +33,49 @@ keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
 
 
 
-mainLoopIO :: Vector.Dimension -> Maybe Ships.Ship -> [[Ships.Ship]] -> IO ()
-mainLoopIO _ Nothing _ = putStrLn "ERROR"
-mainLoopIO windowDimension userShip enemyShips = do
+mainLoopIO :: Vector.Dimension -> Random.StdGen-> Maybe Ships.Ship -> [Maybe Ships.Ship] -> IO ()
+mainLoopIO _ _ Nothing _ = putStrLn "ERROR"
+mainLoopIO windowDimension randomGenerator userShip enemyShips = do
+  ANSI.setCursorPosition 0 0
   -- IO functionality
   hFlush stdout
   char <- ifReadyDo stdin getChar -- (bracket_ (hSetEcho stdin False) (hSetEcho stdin old) getChar)
-
+  let (randomValue, newRandomGenerator) = Random.randomR (1, 100) randomGenerator :: (Int, Random.StdGen)
   let newShip =
         userShip
         >>= (keyboardController windowDimension char)
         -- TODO: >>= Ships.killedByEnemyBullet enemyShips
-        >>= Ships.runAndCleanBullet
-  {- TODO: implement all this function
+        >>= Ships.runAndCleanBullet (subtract 1) (0 <)
+
+  --TODO: implement all this function
+  --let newEnemyShips =
+  --      enemyShips
+  --      [X] Ships.addBulletOnEnemyStack (randomValue > 40) newRandomGenerator
+  --      [ ] Ships.killedByUserBullet newShip
+  --      [ ] Ships.moveEnemyShips
+  --      [X] Ships.runAndCleanBullet (1+) (Vector.height windowDimension >)
+  let ewEnemyShips = Ships.addBulletOnEnemyStack (
+        randomValue > 90) newRandomGenerator enemyShips
   let newEnemyShips =
-        enemyShips
-        >>= Ships.killedByUserBullet newShip
-        >>= Ships.moveEnemyShips
-        >>= Ships.runAndCleanBullet
-  -}
+        (\x ->
+           x >>= Ships.runAndCleanBulletE) <$> ewEnemyShips
+  
+  -- let newEnemyShips = fmap (\x -> x >>= Ships.runAndCleanBulletE) sEnemyShips
+        --Ships.addBulletOnEnemyStack (randomValue > 40) newRandomGenerator
+        -- (\x -> x >>= Ships.runAndCleanBullet (1+) ((Vector.height windowDimension) + 1  >)) <$>
+        -- (\x -> x >>= Ships.runAndCleanBullet (1+) ((Vector.height windowDimension >))) <$>
+
+
   Ships.renderShipM             newShip
-  Ships.renderBulletsM          newShip
+  Ships.renderGamerBullets      newShip
   Ships.renderBulletCountM      newShip
   Ships.renderLifeCountM        newShip windowDimension
-  Ships.renderAllEnemyShips     enemyShips --newEnemyShips
+  Ships.renderEnemyBullets      newEnemyShips windowDimension
+  Ships.renderAllEnemyShips     newEnemyShips
+  Ships.renderEnemyBulletCount  newEnemyShips
   -- TODO: Ships.renderAllEnemyBullets   newEnemyShips
   usleep 10000
-
-  mainLoopIO windowDimension newShip enemyShips
+  mainLoopIO windowDimension newRandomGenerator newShip newEnemyShips
 
 main = do
   putStr ANSI.hideCursorCode
@@ -76,8 +92,10 @@ main = do
         , Ships.bullets         = []
         , Ships.lifes           = Just 3
         }
-  let enemyMatrix = Ships.createEnemyShipTemplate windowDimension
-  catch (mainLoopIO windowDimension userShips enemyMatrix) handler
+  -- create one layout enemy matrix [[Ship]] to [Ship]
+  let enemyMatrix               = concat $ Ships.createEnemyShipTemplate windowDimension
+  let startRandomGenerator      = Random.mkStdGen 980918
+  catch (mainLoopIO windowDimension startRandomGenerator userShips enemyMatrix) handler
   putStrLn ANSI.showCursorCode
 
   --ANSI.clearScreen
