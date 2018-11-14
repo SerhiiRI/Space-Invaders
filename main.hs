@@ -9,7 +9,6 @@ import qualified Library.Ships          as Ships
 import qualified System.Random          as Random (StdGen, mkStdGen, randomR)
 
 
-
 ifReadyDo :: Handle -> IO a -> IO (Maybe a)
 ifReadyDo hnd x = hReady hnd >>= f
    where f True = x >>= return . Just
@@ -32,21 +31,26 @@ keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
                                                               }
 
 
+finishGame :: IO ()
+finishGame = do
+  ANSI.setCursorPosition 20 20
+  putStrLn "No zjebaleś kolego"
+  usleep 100000
+  finishGame
 
-mainLoopIO :: Vector.Dimension -> Random.StdGen-> Maybe Ships.Ship -> [Maybe Ships.Ship] -> IO ()
-mainLoopIO _ _ Nothing _ = putStrLn "ERROR"
-mainLoopIO windowDimension randomGenerator userShip enemyShips = do
+mainLoopIO :: Float -> Int -> Vector.Dimension -> Random.StdGen-> Maybe Ships.Ship -> [Maybe Ships.Ship] -> IO ()
+mainLoopIO _ _ _ _ Nothing _ = putStrLn "ERROR"
+mainLoopIO _PI counter windowDimension randomGenerator userShip enemyShips = do
   ANSI.setCursorPosition 0 0
   -- IO functionality
   hFlush stdout
   char <- ifReadyDo stdin getChar -- (bracket_ (hSetEcho stdin False) (hSetEcho stdin old) getChar)
-  let (randomValue, newRandomGenerator) = Random.randomR (1, 100) randomGenerator :: (Int, Random.StdGen)
+  let (randomValue, newRandomGenerator) = Random.randomR (1, 1000) randomGenerator :: (Int, Random.StdGen)
   let newShip =
         userShip
         >>= (keyboardController windowDimension char)
         -- TODO: >>= Ships.killedByEnemyBullet enemyShips
-        >>= Ships.runAndCleanBullet (subtract 1) (0 <)
-
+        >>= Ships.runAndCleanBullet 0 (subtract 1) (0 <)
   --TODO: implement all this function
   --let newEnemyShips =
   --      enemyShips
@@ -54,17 +58,19 @@ mainLoopIO windowDimension randomGenerator userShip enemyShips = do
   --      [ ] Ships.killedByUserBullet newShip
   --      [ ] Ships.moveEnemyShips
   --      [X] Ships.runAndCleanBullet (1+) (Vector.height windowDimension >)
-  let ewEnemyShips = Ships.addBulletOnEnemyStack (
-        randomValue > 90) newRandomGenerator enemyShips
-  let newEnemyShips =
-        (\x ->
-           x >>= Ships.runAndCleanBulletE) <$> ewEnemyShips
-  
-  -- let newEnemyShips = fmap (\x -> x >>= Ships.runAndCleanBulletE) sEnemyShips
-        --Ships.addBulletOnEnemyStack (randomValue > 40) newRandomGenerator
-        -- (\x -> x >>= Ships.runAndCleanBullet (1+) ((Vector.height windowDimension) + 1  >)) <$>
-        -- (\x -> x >>= Ships.runAndCleanBullet (1+) ((Vector.height windowDimension >))) <$>
 
+
+  let ewEnemyShips =
+        (\x -> x >>= Ships.runAndCleanBullet (mod counter 4) (+1) (< (Vector.height windowDimension)))
+        <$> (Ships.addBulletOnEnemyStack (randomValue > 990) newRandomGenerator enemyShips)
+  let (new_PI, newEnemyShips) =
+        if (mod counter 40 == 0)
+        then
+           if (let (l, r) = Ships.getShipsLimitersPoint ewEnemyShips; (wl, wr) = (0, Vector.width windowDimension)
+               in (or [wl==l, wr==r]))
+           then (let np = _PI + pi in (np, Ships.moveEnemyShips (+ (round $ cos np)) (+1) True ewEnemyShips))
+           else (_PI, Ships.moveEnemyShips (+ (round $ cos _PI)) (id) True ewEnemyShips)
+        else (_PI, ewEnemyShips)
 
   Ships.renderShipM             newShip
   Ships.renderGamerBullets      newShip
@@ -73,9 +79,13 @@ mainLoopIO windowDimension randomGenerator userShip enemyShips = do
   Ships.renderEnemyBullets      newEnemyShips windowDimension
   Ships.renderAllEnemyShips     newEnemyShips
   Ships.renderEnemyBulletCount  newEnemyShips
-  -- TODO: Ships.renderAllEnemyBullets   newEnemyShips
+  Ships.clearBetweenEnemyShips  newEnemyShips
+  let nc = if | counter == 10000  -> 0
+              | otherwise         -> counter+1
+  -- TODO: if intersect with ships,
+  -- then run function finishGame
   usleep 10000
-  mainLoopIO windowDimension newRandomGenerator newShip newEnemyShips
+  mainLoopIO new_PI nc windowDimension newRandomGenerator newShip newEnemyShips
 
 main = do
   putStr ANSI.hideCursorCode
@@ -88,14 +98,14 @@ main = do
         Ships.point             = genr windowDimension
         , Ships.viewShip        = Ships.defaultUserShip
         , Ships.shipSprite      = Ships.defaultUserSprite
-        , Ships.viewBullet      = Ships.defaultBulletView
+        , Ships.viewpBullet      = Ships.defaultBulletView
         , Ships.bullets         = []
         , Ships.lifes           = Just 3
         }
   -- create one layout enemy matrix [[Ship]] to [Ship]
   let enemyMatrix               = concat $ Ships.createEnemyShipTemplate windowDimension
   let startRandomGenerator      = Random.mkStdGen 980918
-  catch (mainLoopIO windowDimension startRandomGenerator userShips enemyMatrix) handler
+  catch (mainLoopIO pi 0 windowDimension startRandomGenerator userShips enemyMatrix) handler
   putStrLn ANSI.showCursorCode
 
   --ANSI.clearScreen
