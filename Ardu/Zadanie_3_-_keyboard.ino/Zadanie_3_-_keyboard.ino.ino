@@ -1,9 +1,8 @@
 int btn[3] = {2,3,4}; // pin for buttons
 int led[3] = {5,6,7}; // pin of led
-boolean info[] = {0,0,0}; // newData, message1, message2
-String key[] = {"A", "D", " "}; //ASCII symbol for buttons
-char serialData; //Data from ruspberry
-String serialRead;
+String key[] = {"a", "d", " "}; //ASCII symbol for buttons
+String serialRead="";
+bool info[] = {false, false};
 
 void setup() {
   // put your setup code here, to run once:
@@ -15,9 +14,9 @@ void setup() {
   Serial.println("i-Start program."); // i- send info
   for(int i = led[0]; i<=led[2]; i++){
     digitalWrite(i, HIGH);
-    delay(200);
+    delay(50);
   }
-  delay(500);
+  delay(100);
   for(int i = led[0]; i<=led[2]; i++){
     digitalWrite(i, LOW);
   }
@@ -26,38 +25,85 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   GetSerialData();
-  ChangeLED();
-  ReadKeyboard();
-}
-
-//Waiting for data from ruspberry
-void GetSerialData(){
-  if (Serial.available()>0){
-    info[0] = true;
-    serialData = Serial.read();
-  }
-}
-
-//Check how many player have lives.
-void ChangeLED(){
-//  delay(500);
-  serialRead = String(serialData);
-  if(serialRead == "x")Serial.println("x"); //x close app loop
-  int ledNum = int((serialData - '0'));
-  boolean ledStat;
-  if(info[0] == true){
-    Serial.println(String(ledNum));
-    if(digitalRead(ledNum)==LOW){
-      digitalWrite(ledNum, HIGH);
-      Serial.println("Pin " + String(ledNum) + " is HIGH");
-    }else{  
-      digitalWrite(ledNum, LOW);
-      Serial.println("Pin " + String(ledNum) + " is LOW");
+  if(serialRead == "@"){
+      OutOfScript();
+      reset();
+    }else{
+      ReadMessage();
+      ReadKeyboard();
     }
-    info[0] = false;
+}
+
+// React for close py script
+void OutOfScript(){
+    Serial.println("i-: Py Script has already been closed.");
+    digitalWrite(led[0], HIGH);
+    digitalWrite(led[2], HIGH);
+    delay(1000);
+    digitalWrite(led[0], LOW);
+    digitalWrite(led[2], LOW);
+}
+
+//Waiting for data from Serial
+void GetSerialData(){
+  if(Serial.available()>0){
+    char serialData = Serial.read();
+    serialRead += serialData;
+    info[0]=true;
+    delay(10);
+  }else{
+    if(info[0]){
+      info[1]=true;
+    }
   }
 }
 
+//Read message from serial
+void ReadMessage(){
+  if(info[0] && info[1]){
+    Serial.println("i-: " + serialRead);
+    String tmp = ":(";
+    int caseme = 0;
+    tmp = String(serialRead[0]) + String(serialRead[1]);
+    Serial.println("Type: " + tmp);
+    if(tmp == "l-"){caseme = 1;}else
+    if(tmp == "b-"){caseme = 2;}
+    switch (caseme) {
+      case 1:
+          Serial.println("Change led stat.");
+          for(int i = 2; i<=4; i++){
+            for(int j = 1; j<=3; j++){
+              if(String(serialRead[i]).toInt()==j || String(serialRead[i]).toInt()==j+4)LedSwitch(j-1);  
+            }
+          }
+        break;
+      case 2:
+          Serial.println("Change button hotkey.");
+          for(int j = 0; j<=2; j++){
+            key[j] = String(serialRead[j+2]);
+          }
+            Serial.println("-- New HotKey --");
+            Serial.println("Left: " + key[0]);
+            Serial.println("Rigth: " + key[1]);
+            Serial.println("Shoot: " + key[2]);
+            Serial.println("----------------");
+        break;
+      default:
+          Serial.println("WTF is this? I don't get it.");
+        break;
+     }
+    
+    serialRead = "";
+    info[0]=false;
+    info[1]=false;
+  }
+}
+
+void LedSwitch(int x){
+  if(digitalRead(led[x])==0){digitalWrite(led[x], HIGH);}else{digitalWrite(led[x], LOW);}
+}
+
+// click the button and LED up
 void BtnPressTest(int x){
     digitalWrite(x, HIGH);
     delay(3);
