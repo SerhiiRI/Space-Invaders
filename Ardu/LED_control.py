@@ -21,11 +21,11 @@ def readArdu():
             else:
                 print(m[4])
 
-def sendMsg(prefix='s-', mess='#', suffix='#'):
+def sendMsg(prefix='s-', mess='', suffix=''):
     '''
-    mode space message end
+    mode space message
     s like send
-    s-message#
+    s-message
     '''
     mess = str(prefix) + str(mess) + str(suffix)
     ser.write(bytes(mess, "UTF-8"))
@@ -37,7 +37,7 @@ def main():
     menuInput = ''
     while menuInput!='exit':
         print()
-        print("1. Send test message.\n2. Send your own message.\n3. Add yours keys.\n0. Exit")
+        print("1. Send test message.\n2. Send your own led change.\n3. Add yours keys.\n0. Exit")
         menuInput = int(input())
         # Close app
         if menuInput == 0:
@@ -52,13 +52,13 @@ def main():
 
         # Pin test
         if menuInput == 1:   
-            sendMsg('t-', '567')
+            sendMsg('t-')
 
         # Pin mode
         if menuInput == 2:
             print("Choose pin: ")
             mess = str(input())
-            sendMsg(mess)
+            sendMsg('l-',mess)
         
         # Change input buttons
         if menuInput == 3:

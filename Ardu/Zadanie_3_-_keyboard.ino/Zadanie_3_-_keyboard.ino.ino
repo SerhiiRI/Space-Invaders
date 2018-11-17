@@ -3,6 +3,7 @@ int led[3] = {5,6,7}; // pin of led
 String key[] = {"a", "d", " "}; //ASCII symbol for buttons
 String serialRead="";
 bool info[] = {false, false};
+bool quit = false;
 
 void setup() {
   // put your setup code here, to run once:
@@ -25,10 +26,12 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
   GetSerialData();
-  if(serialRead == "@"){
+  if(serialRead == "@" && !quit){
+      quit = true;
       OutOfScript();
       reset();
     }else{
+      quit = false;
       ReadMessage();
       ReadKeyboard();
     }
@@ -67,7 +70,8 @@ void ReadMessage(){
     tmp = String(serialRead[0]) + String(serialRead[1]);
     Serial.println("Type: " + tmp);
     if(tmp == "l-"){caseme = 1;}else
-    if(tmp == "b-"){caseme = 2;}
+    if(tmp == "b-"){caseme = 2;}else
+    if(tmp == "t-"){caseme = 3;}
     switch (caseme) {
       case 1:
           Serial.println("Change led stat.");
@@ -88,6 +92,15 @@ void ReadMessage(){
             Serial.println("Shoot: " + key[2]);
             Serial.println("----------------");
         break;
+      case 3:
+          reset();
+          int cor = 0;
+          for(int i = 0; i<=4; i++){
+            delay(100);
+            LedSwitch(i-cor);
+            if(i==2){LedSwitch(0); cor = 2;}
+          }
+        break;
       default:
           Serial.println("WTF is this? I don't get it.");
         break;
@@ -100,7 +113,7 @@ void ReadMessage(){
 }
 
 void LedSwitch(int x){
-  if(digitalRead(led[x])==0){digitalWrite(led[x], HIGH);}else{digitalWrite(led[x], LOW);}
+    if(digitalRead(led[x])==0){digitalWrite(led[x], HIGH);}else{digitalWrite(led[x], LOW);}
 }
 
 // click the button and LED up
