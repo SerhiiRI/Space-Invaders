@@ -9,15 +9,18 @@ module Library.Ships
   , addBulletOnEnemyStack
   , renderBulletCountM
   , renderEnemyBullets
-  , renderEnemyBulletCount
   , renderGamerBullets
   , renderLifeCountM
   , clearBetweenEnemyShips
+  , clearEnemyShips
   , runAndCleanBullet
   , getShipsLimitersPoint
   , moveEnemyShips
   , createEnemyShipTemplate
   , renderAllEnemyShips
+  , intersectEnemyShips
+  -- to deprecate
+  , killing
   ) where
 
 -- Point (X, Y)
@@ -39,14 +42,10 @@ defaultEnemySprite      = (length(head defaultShip), length(defaultShip))
 defaultEnemyBulletView  :: [String]
 defaultEnemyBulletView  = ["+", " "]
 
-
 type Width = Int
 type Height = Int
 
-
--- | Bullet data types is only Point
 newtype Bullet = Bullet { getBullet :: Point } deriving (Show)
-
 
 -- | Ship - main controll user ship
 -- This ships may be abble to interraction
@@ -55,10 +54,8 @@ data Ship = Ship { point :: Point
                  , shipSprite      :: (Width, Height)
                  , viewBullet      :: [String]
                  , bullets         :: [Bullet]
-                 , lifes           :: Maybe Int
+                 , lifes           :: Int
                  } deriving (Show)
-
-
 
 -- Enemy Ships functions
 -- TODO: create offset to dimension enemymatrix
@@ -70,46 +67,94 @@ createEnemyShipTemplate dimension = do
                                  , shipSprite   = defaultEnemySprite
                                  , viewBullet   = defaultEnemyBulletView
                                  , bullets      = []
-                                 , lifes        = Just 1
-                                 }
-                                               )
+                                 , lifes        = 1
+                                 })
   let (startX, startY) = generateStartPoint dimension
   updateMatrix startX startY enemyMatrix
   where
-    updateMatrix px py enemyShips = zipWith (
-      \enemies@(enm:enms) y -> toOffset (py+((+) 1 $ snd (shipSprite enm))*y) px enemies
-      ) enemyShips [1..]
-    generateStartPoint (Dimension {height=xheight, width=xwidth}) = ((xwidth `div` 3), (xheight `div` 10))
+    updateMatrix :: Int -> Int -> [[Ship]] -> [[Maybe Ship]]
+    updateMatrix px py enemyShips = zipWith (\enemies@(enm:enms) y -> toOffset (py+((+) 1 $ snd (shipSprite enm))*y) px enemies) enemyShips [1..]
+    generateStartPoint :: Dimension -> (Int, Int)
+    generateStartPoint (Dimension {height=xheight, width=xwidth}) = ((xwidth `div` 5), (xheight `div` 12))
+    toOffset :: Int -> Int -> [Ship] -> [Maybe Ship]
+    toOffset y_offset x_offset [] = []
+    toOffset y_offset x_offset (e:ex) = [(Just (e {point=(Point x_offset y_offset)}))]
+                                        ++ (toOffset y_offset ((fst (shipSprite e))+ x_offset) ex)
 
 
 -- | addBulletOnEnemyStack make choise using Bool value about logic of shooting
--- StdGen - generator need to choise one of ships 
+-- StdGen - generator need to choise one of ships
 addBulletOnEnemyStack :: Bool -> StdGen -> [Maybe Ship] -> [Maybe Ship]
 addBulletOnEnemyStack False rGen enemyMatrix = enemyMatrix
 addBulletOnEnemyStack True rGen enemyMatrix = do
-  let (rv, _)  = randomR (1, (length enemyMatrix)-1) rGen
+  let (rv, _)  = randomR (0, (length enemyMatrix)-1) rGen
   let (tright, (x:xs)) = splitAt rv enemyMatrix in (tright ++ [ x >>= addBulletStack ] ++ xs)
 
 
 
-toOffset :: Int -> Int -> [Ship] -> [Maybe Ship]
-toOffset y_offset x_offset []           = []
-toOffset y_offset x_offset (e:ex)       = do
-  [(Just (e {point=(Point x_offset y_offset)}))] ++ (toOffset y_offset ((fst (shipSprite e))+ x_offset) ex)
+-- USER FUNCTION. Create killled function for enemies.
+-- create separate function for testing function by enemies
+killing :: [Maybe Ship] -> Maybe Ship -> (Maybe Ship, [Maybe Ship], [Maybe Ship])
+killing enemiesListship Nothing = (Nothing, enemiesListship, [])
+killing enemiesListship (Just ship) = do
+  let (nnewGamer, newEnemyList, _) = (foldl scaningForEnemies (ship, [], []) enemiesListship)
+  if | (lifes nnewGamer) <= 0 -> (Nothing, newEnemyList, [])
+     | otherwise -> let (newGamer, nnewEnemyList, listToClean) = (foldl scaningForUser (nnewGamer, [], []) newEnemyList) in (Just newGamer, nnewEnemyList, listToClean)
+  where
+    scaningForUser (currentShip, newEnemyList, toClean) currentEnemyShip =
+      case currentEnemyShip of
+          (Nothing) -> (currentShip, newEnemyList, toClean)
+          (Just enemyShip) -> let (nGamerShip, nEnemyShip) =  intersectBulletSprite (+2) currentShip enemyShip [] in
+            if | lifes nEnemyShip <= 0 -> (nGamerShip, newEnemyList, (Just nEnemyShip) : toClean)
+               | otherwise -> (nGamerShip, (Just nEnemyShip) : newEnemyList, toClean)
+    scaningForEnemies (currentShip, newEnemyList, toClean) currentEnemyShip =
+      case currentEnemyShip of
+        (Nothing)       -> (currentShip, newEnemyList, toClean)
+        (Just enemyShip)-> let (newEnemy, newGamer) = intersectBulletSprite (subtract 1) enemyShip currentShip []
+                           in (newGamer, (Just newEnemy) : newEnemyList, [])
 
 
--- /****************************************************************************************\ --
+intersectBulletSprite :: (Int -> Int) -> Ship -> Ship -> [Bullet] -> (Ship, Ship)
+intersectBulletSprite yOffset enemy@(Ship {bullets=[]}) gamer newBulletsList = (enemy {bullets=newBulletsList}, gamer)
+intersectBulletSprite yOffset enemy@(Ship {bullets=(blt:bltsls)}) ship currentBulletList = do
+  if (inSection (point ship) (shipSprite ship) (getBullet blt))
+    then intersectBulletSprite yOffset (enemy {bullets=bltsls}) (ship {lifes=((lifes ship)-1)}) currentBulletList
+    else intersectBulletSprite yOffset (enemy {bullets=bltsls}) ship (blt : currentBulletList)
+  where
+    inSection :: Point -> (Int, Int) -> Point -> Bool
+    inSection (Point shipX shipY) (shipWidth, shipHeight) (Point bulletX bulletY) =
+      and ([
+              and [shipY < yOffset bulletY, (shipY+shipHeight) > yOffset bulletY],
+              and [shipX < bulletX, (shipX+shipWidth) > bulletX]
+           ])
+
+
+intersectEnemyShips :: [Maybe Ship] -> Ship -> Maybe Ship
+intersectEnemyShips [] gamerShip = Just gamerShip
+intersectEnemyShips enemiesList gamerShip =
+  if (inSectionFromAll enemiesList gamerShip False)
+  then Nothing
+  else Just gamerShip
+  where
+    inSectionFromAll [] gamer finishBool = finishBool
+    inSectionFromAll ((Just enemy):enemiesls) gamer finishBool = if (inSection (point gamer) (shipSprite enemy) (point enemy))
+      then inSectionFromAll [] gamer True
+      else inSectionFromAll enemiesls gamer False
+    inSection :: Point -> (Int, Int) -> Point -> Bool
+    inSection (Point _ shipY) (_, shipHeight) (Point _ enemyY) = shipY == (shipHeight)+enemyY
+
+
 
 moveEnemyShips :: (Int -> Int) -> (Int -> Int) ->  Bool -> [Maybe Ship] -> [Maybe Ship]
 moveEnemyShips _ _ False ship = ship
 moveEnemyShips moveLRFunc moveDownFunc True shipsList = map (
   \maybeShip -> case maybeShip of
                   (Nothing) -> Nothing
-                  (Just ship@(Ship {point=(Point xp yp)})) -> Just ship {point=(Point (moveLRFunc xp) (moveDownFunc yp))}
-  ) shipsList
-
+                  (Just ship@(Ship {point=(Point xp yp)}))
+                    -> Just ship {point=(Point (moveLRFunc xp) (moveDownFunc yp))}) shipsList
 
 getShipsLimitersPoint :: [Maybe Ship] -> (Int, Int)
+getShipsLimitersPoint [] = (0, 0)
 getShipsLimitersPoint enemyList@((Just enemy):_) =
   let listOfX = foldr (\x acc -> case x of
                           (Nothing)                                                     -> acc
@@ -117,15 +162,10 @@ getShipsLimitersPoint enemyList@((Just enemy):_) =
                       )  [] enemyList
   in (minimum listOfX, (maximum listOfX + (fst $ shipSprite enemy)))
 
-
--- \****************************************************************************************/ --
-
-
 renderAllEnemyShips :: [Maybe Ship] -> IO ()
 renderAllEnemyShips [] = putStrLn ""
 renderAllEnemyShips enemyMatrix = do
   mapM_ renderShipM enemyMatrix
-
 
 clearBetweenEnemyShips :: [Maybe Ship] -> IO ()
 clearBetweenEnemyShips [] = putStr ""
@@ -135,20 +175,26 @@ clearBetweenEnemyShips ((Just ship@(Ship { point=(Point xp yp) })):enems) = do
   ANSI.clearLine
   clearBetweenEnemyShips enems
 
+clearEnemyShips :: [Maybe Ship] -> IO ()
+clearEnemyShips [] = putStr ""
+clearEnemyShips enemyMatrix = do
+  mapM_ cleanShipM enemyMatrix
 
-
--- render enemy Bullets
+cleanShipM :: Maybe Ship -> IO ()
+cleanShipM (Nothing) = putStr ""
+cleanShipM (Just (Ship {point=(Point x_position y_position), viewShip=[]})) = ANSI.setCursorPosition y_position x_position
+cleanShipM (Just ship@(Ship { point=(Point x_position y_position), viewShip=(l:ls) })) = do
+  ANSI.setCursorPosition (y_position) x_position
+  putStr $ concat $ replicate (length l) " "
+  cleanShipM (Just (ship {point=(Point x_position (y_position+1)), viewShip=ls}))
 
 renderShipM :: Maybe Ship -> IO ()
-renderShipM (Nothing) = do
-  putStr ""
+renderShipM (Nothing) = putStr ""
+renderShipM (Just (Ship {point=(Point x_position y_position), viewShip=[]})) = ANSI.setCursorPosition y_position x_position
 renderShipM (Just ship@(Ship { point=(Point x_position y_position), viewShip=(l:ls) })) = do
   ANSI.setCursorPosition y_position x_position
   putStr l
   renderShipM (Just (ship {point=(Point x_position (y_position+1)), viewShip=ls}))
-renderShipM (Just (Ship {point=(Point x_position y_position), viewShip=[]})) = do
-  ANSI.setCursorPosition y_position x_position
-
 
 addBulletStack :: Ship -> Maybe Ship
 addBulletStack ship@(Ship {point=(Point xloc yloc), shipSprite=(spriteW,spriteH), bullets=bulletList }) =
@@ -172,12 +218,9 @@ renderBulletsMechanism borderPredicate incFunc (Just ship@(Ship {viewBullet=vb, 
             then ANSI.setCursorPosition y_position x_position
             else rBullet vvb (Bullet (Point {x=x_position, y=(incFunc y_position)}))
 
-
-
-
 -- | Bullets render function for Gamer
 -- send to function renderBulletMechanism border predicate
--- , moving bullet step, and gamer ship controller
+-- ,moving bullet step, and gamer ship controller
 renderGamerBullets :: Maybe Ship -> IO ()
 renderGamerBullets ships = renderBulletsMechanism (< 2) (+1) ships
 
@@ -194,20 +237,10 @@ renderBulletCountM (Just ship) = do
 
 renderLifeCountM :: Maybe Ship -> Dimension -> IO ()
 renderLifeCountM Nothing _ = putStr ""
-renderLifeCountM (Just ship@(Ship {lifes=(Just countLifes)})) terminalWindowsDimension = do
+renderLifeCountM (Just ship@(Ship {lifes=countLifes})) terminalWindowsDimension = do
   ANSI.setCursorPosition 1 ((subtract 15) (width terminalWindowsDimension))
   putStr $ "Lifies: " ++ (show $ countLifes)
 
-
-renderEnemyBulletCount :: [Maybe Ship] -> IO ()
-renderEnemyBulletCount enemyListM = do
-  ANSI.setCursorPosition 56 5
-  putStr $ "Enemies Bullets:  " ++ (
-    show $ foldr (
-        \enUnit acc -> case enUnit of
-                         (Just enemy )       -> (acc + length (bullets enemy))
-                         (Nothing)           -> acc
-        ) 0 enemyListM)
 
 -- | runAndCleanBullet - function
 runAndCleanBullet :: Int -> (Int -> Int) -> (Int -> Bool) -> Ship -> Maybe Ship
@@ -218,4 +251,3 @@ runAndCleanBullet f func fpredicate ship@(Ship {bullets=bulletsList}) = Just shi
       | (f /= 0) = (Bullet {getBullet=(Point {x=nx, y=(ny)})}) : newBulletsList
       | (fpredicate ny) = (Bullet {getBullet=(Point {x=nx, y=(func ny)})}) : newBulletsList
       | otherwise = (newBulletsList)
-
