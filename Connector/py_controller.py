@@ -2,24 +2,39 @@ import serial
 import threading
 import time
 import sys
-from pynput.keyboard import Key, Controller
 from multiprocessing.pool import ThreadPool
 
 _LISTENING = True
 
 def readArdu():
     print("Start Listening.")
+    info = [0,0]
+    data = ''
     while _LISTENING:
-        m = ser.readline()
-        m = str(m)
-        if m[2]=='i':
-            print("\nRead message: {}".format(m))
 
-        if m[2]=='b':
-            if(m[4]==' '):
-                print('Space')
-            else:
-                print(m[4])
+        #  on rpi
+        if ser.inWaiting()>0:
+            data = data + ser.read()
+            info[0]=1
+        else:
+            if info[0]==1:
+                info[1]=1
+                print(data)
+                info[0]=0
+                info[1]=0
+
+        # on windows and linux
+        # m = ser.readline()
+        # m = str(m)
+        # if m[2]=='i':
+        #     print("\nRead message: {}".format(m))
+
+        # if m[2]=='b':
+        #     if(m[4]==' '):
+        #         print('Space')
+        #     else:
+        #         print(m[4])
+    ser.close()
 
 def sendMsg(prefix='s-', mess='', suffix=''):
     '''
@@ -28,7 +43,8 @@ def sendMsg(prefix='s-', mess='', suffix=''):
     s-message
     '''
     mess = str(prefix) + str(mess) + str(suffix)
-    ser.write(bytes(mess, "UTF-8"))
+    #ser.write(bytes(mess, "UTF-8")) # on windows and linux
+    ser.write(mess.encode("UTF-8")) # on rpi
 
 def main():
     global _LISTENING
