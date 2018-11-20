@@ -25,8 +25,11 @@ def readArdu():
                     mode = data[0]+data[1]
                     if(mode=='s-'):
                         print('>>Light: {}'.format(data[2]))
+                        open('ligth.txt','w').write(data[2])
                     elif(mode=='b-'):
                         print('>>Button Down: {}'.format(data[2]))
+                        open('btn.txt','w').write(data[2])
+                        #print('>>Button Down: {}'.format(open('btn.txt').read()))
                 data = ''
             else:
                 data = data + tmp[2]
