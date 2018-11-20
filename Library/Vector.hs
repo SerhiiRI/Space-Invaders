@@ -12,7 +12,9 @@ import qualified System.Console.Terminal.Size as Size
 
 data Point = Point { x :: Int, y :: Int} deriving (Show)
 data Dimension = Dimension { height :: Int, width :: Int } deriving (Show)
-
+instance Eq Dimension where
+  a@(Dimension ah aw) == b@(Dimension bh bw) = ah == bh && aw == bw
+  a@(Dimension ah aw) /= b@(Dimension bh bw) = ah /= bh || aw /= bw
 
 renderOnPoint :: Point -> [String] -> IO ()
 renderOnPoint (Point x_position y_position) (x:xs) = do

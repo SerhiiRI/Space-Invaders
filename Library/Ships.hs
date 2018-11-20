@@ -39,13 +39,17 @@ defaultShip             :: [String]
 defaultShip             = [" /^\\ ", " \\^/ "]
 defaultEnemySprite      :: (Width, Height)
 defaultEnemySprite      = (length(head defaultShip), length(defaultShip))
+
 defaultEnemyBulletView  :: [String]
 defaultEnemyBulletView  = ["+", " "]
 
 type Width = Int
 type Height = Int
-
+type Offset = Int
 newtype Bullet = Bullet { getBullet :: Point } deriving (Show)
+
+
+
 
 -- | Ship - main controll user ship
 -- This ships may be abble to interraction
@@ -57,10 +61,11 @@ data Ship = Ship { point :: Point
                  , lifes           :: Int
                  } deriving (Show)
 
+
 -- Enemy Ships functions
 -- TODO: create offset to dimension enemymatrix
-createEnemyShipTemplate :: Dimension -> [[Maybe Ship]]
-createEnemyShipTemplate dimension = do
+createEnemyShipTemplate :: Offset -> Dimension -> [[Maybe Ship]]
+createEnemyShipTemplate offsetByY dimension = do
   let enemyMatrix = replicate 4 $ replicate 10 (Ship {
                                  point          = Point 0 0
                                  , viewShip     = defaultShip
@@ -75,7 +80,7 @@ createEnemyShipTemplate dimension = do
     updateMatrix :: Int -> Int -> [[Ship]] -> [[Maybe Ship]]
     updateMatrix px py enemyShips = zipWith (\enemies@(enm:enms) y -> toOffset (py+((+) 1 $ snd (shipSprite enm))*y) px enemies) enemyShips [1..]
     generateStartPoint :: Dimension -> (Int, Int)
-    generateStartPoint (Dimension {height=xheight, width=xwidth}) = ((xwidth `div` 5), (xheight `div` 12))
+    generateStartPoint (Dimension {height=xheight, width=xwidth}) = ((xwidth `div` 5), offsetByY+(xheight `div` 12))
     toOffset :: Int -> Int -> [Ship] -> [Maybe Ship]
     toOffset y_offset x_offset [] = []
     toOffset y_offset x_offset (e:ex) = [(Just (e {point=(Point x_offset y_offset)}))]
@@ -232,15 +237,13 @@ renderBulletCountM :: Maybe Ship -> IO ()
 renderBulletCountM Nothing = putStr ""
 renderBulletCountM (Just ship) = do
   ANSI.setCursorPosition 1 5
-  putStr
-    $ (++) "Bullts: " (show $ length (bullets ship))
+  putStr $ (++) "Bullts: " (show $ length (bullets ship))
 
 renderLifeCountM :: Maybe Ship -> Dimension -> IO ()
 renderLifeCountM Nothing _ = putStr ""
 renderLifeCountM (Just ship@(Ship {lifes=countLifes})) terminalWindowsDimension = do
   ANSI.setCursorPosition 1 ((subtract 15) (width terminalWindowsDimension))
   putStr $ "Lifies: " ++ (show $ countLifes)
-
 
 -- | runAndCleanBullet - function
 runAndCleanBullet :: Int -> (Int -> Int) -> (Int -> Bool) -> Ship -> Maybe Ship
