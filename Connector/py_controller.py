@@ -4,13 +4,16 @@ import time
 import sys
 from multiprocessing.pool import ThreadPool
 
-_LISTENING = True
+_PROCESS=True #if True then multiprocessing run
+_LISTENING = True #Listening serial port
+_TEMP=True #Get update cpu temperature
 
 def readArdu():
-    print("Start Listening.")
+    global _LISTENING
+    print(">>Start Listening.")
     info = [0,0]
     data = ''
-    while _LISTENING:
+    while _PROCESS:
 
         #  on rpi
         if ser.inWaiting()>0:
@@ -19,88 +22,57 @@ def readArdu():
         else:
             if info[0]==1:
                 info[1]=1
-                print(data)
+                print('>>{}'.format(data))
                 info[0]=0
                 info[1]=0
-
-        # on windows and linux
-        # m = ser.readline()
-        # m = str(m)
-        # if m[2]=='i':
-        #     print("\nRead message: {}".format(m))
-
-        # if m[2]=='b':
-        #     if(m[4]==' '):
-        #         print('Space')
-        #     else:
-        #         print(m[4])
+    _LISTENING = False
+    #print('Stop Listening')
     ser.close()
+    
+    
+def readTemp():
+    global _TEMP
+    print(">>Start Temp Reading.")
+    while _PROCESS:
+        time.sleep(5)
+        print('CPU Temp: 25')
+    _TEMP = False    
+    #print('Stop Temp Loop')
+    
 
 def sendMsg(prefix='s-', mess='', suffix=''):
-    '''
-    mode space message
-    s like send
-    s-message
-    '''
     mess = str(prefix) + str(mess) + str(suffix)
-    #ser.write(bytes(mess, "UTF-8")) # on windows and linux
     ser.write(mess.encode("UTF-8")) # on rpi
 
 def main():
+    global _PROCESS
     global _LISTENING
-    pool = ThreadPool(processes=1)
-    pool.apply_async(readArdu)
+    global _TEMP
+    pool1 = ThreadPool(processes=1)
+    pool2 = ThreadPool(processes=2)
+    pool1.apply_async(readArdu)
+    pool2.apply_async(readTemp)
     menuInput = ''
     while menuInput!='exit':
         print()
-        print("1. Send test message.\n2. Send your own led change.\n3. Add yours keys.\n0. Exit")
+        print("1. Send test message.\n0. Exit")
         menuInput = int(input())
         # Close app
         if menuInput == 0:
             sendMsg('','@','')
-            _LISTENING = False
-            print('Finish listening.')
-            pool.terminate()
-            print('Pool terminate.')
-            pool.join()
-            print('Pool join.')
+            _PROCESS = False
+            pool1.terminate()
+            pool1.join()
+            pool2.terminate()
+            pool2.join()
+            print('Closing app')
             menuInput = 'exit'
 
         # Pin test
         if menuInput == 1:   
             sendMsg('t-')
 
-        # Pin mode
-        if menuInput == 2:
-            print("Choose pin: ")
-            mess = str(input())
-            sendMsg('l-',mess)
-        
-        # Change input buttons
-        if menuInput == 3:
-            movement = []
-            print('Move left: ')
-            inp = input()
-            movement.append(inp[0])
-            repeat = True
-            while repeat:
-                print('Move Right: ')
-                inp = input()
-                repeat = False
-                if inp in movement:
-                    repeat = True
-            movement.append(inp[0])
-            repeat = True
-            while repeat:
-                print('Shoot: ')
-                inp = input()
-                repeat = False
-                if inp in movement:
-                    repeat = True
-            movement.append(inp[0])
-            print('HotKey: {} {} {}'.format(movement[0], movement[1], movement[2]))
-            sendMsg('b-', movement[0] + movement[1] + movement[2])
-    print('Close app.')
+    print('App closed.')
 
 isConnection = False
 
