@@ -4,6 +4,8 @@ String key[] = {"a", "d", " "}; //ASCII symbol for buttons
 String serialRead="";
 bool info[] = {false, false};
 bool quit = false;
+int cor = 0;
+int sensor[] = {0, 0};
 
 void setup() {
   // put your setup code here, to run once:
@@ -71,7 +73,8 @@ void ReadMessage(){
     Serial.println("Type: " + tmp);
     if(tmp == "l-"){caseme = 1;}else
     if(tmp == "b-"){caseme = 2;}else
-    if(tmp == "t-"){caseme = 3;}
+    if(tmp == "t-"){caseme = 3;}else
+    if(tmp == "p-"){caseme = 4;}
     switch (caseme) {
       case 1:
           Serial.println("Change led stat.");
@@ -94,12 +97,16 @@ void ReadMessage(){
         break;
       case 3:
           reset();
-          int cor = 0;
+          cor = 0;
           for(int i = 0; i<=4; i++){
             delay(100);
             LedSwitch(i-cor);
             if(i==2){LedSwitch(0); cor = 2;}
           }
+        break;
+      case 4:
+          sensor[1] = analogRead(sensor[0]);//Value of sensor get read from sensor pin 0
+          Serial.println(sensor[1]);
         break;
       default:
           Serial.println("WTF is this? I don't get it.");
