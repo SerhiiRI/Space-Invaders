@@ -66,11 +66,11 @@ void GetSerialData(){
 //Read message from serial
 void ReadMessage(){
   if(info[0] && info[1]){
-    Serial.println("i-: " + serialRead);
+    //Serial.println("i-: " + serialRead);
     String tmp = ":(";
     int caseme = 0;
     tmp = String(serialRead[0]) + String(serialRead[1]);
-    Serial.println("Type: " + tmp);
+    //Serial.println("Type: " + tmp);
     if(tmp == "l-"){caseme = 1;}else
     if(tmp == "b-"){caseme = 2;}else
     if(tmp == "t-"){caseme = 3;}else
@@ -106,7 +106,7 @@ void ReadMessage(){
         break;
       case 4:
           sensor[1] = analogRead(sensor[0]);//Value of sensor get read from sensor pin 0
-          Serial.println(sensor[1]);
+          Serial.println("s-" + String(sensor[1]));
         break;
       default:
           Serial.println("WTF is this? I don't get it.");

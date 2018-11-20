@@ -3,6 +3,8 @@ import threading
 import time
 import sys
 from multiprocessing.pool import ThreadPool
+import psutil
+import RPi.GPIO as GPIO
 
 _PROCESS=True #if True then multiprocessing run
 _LISTENING = True #Listening serial port
@@ -10,21 +12,26 @@ _TEMP=True #Get update cpu temperature
 
 def readArdu():
     global _LISTENING
+    global _PROCESS
     print(">>Start Listening.")
     info = [0,0]
     data = ''
     while _PROCESS:
-
         #  on rpi
         if ser.inWaiting()>0:
-            data = data + ser.read()
-            info[0]=1
-        else:
-            if info[0]==1:
-                info[1]=1
-                print('>>{}'.format(data))
-                info[0]=0
-                info[1]=0
+            tmp = str(ser.read())
+            if tmp[2]=='\\':
+                if data:
+                    mode = data[0]+data[1]
+                    if(mode=='s-'):
+                        print('>>Light: {}'.format(data[2]))
+                    elif(mode=='b-'):
+                        print('>>Button Down: {}'.format(data[2]))
+                data = ''
+            else:
+                data = data + tmp[2]
+            
+        
     _LISTENING = False
     #print('Stop Listening')
     ser.close()
@@ -32,11 +39,27 @@ def readArdu():
     
 def readTemp():
     global _TEMP
+    global _PROCESS
+    fan = False
+    maxTemp = 50
+        
     print(">>Start Temp Reading.")
     while _PROCESS:
-        time.sleep(5)
-        print('CPU Temp: 25')
+        time.sleep(3)
+        temp = psutil.sensors_temperatures()
+        temp = temp['cpu-thermal']
+        temp = temp[0]
+        temp = temp[1]
+        if temp>=maxTemp and fan==False:
+            GPIO.output(21, GPIO.HIGH)
+            fan = True
+        elif temp<maxTemp and fan==True:
+            GPIO.output(21, GPIO.LOW)
+            fan = False
+        print('CPU Temp: {}'.format(temp))
+        sendMsg('p-','')
     _TEMP = False    
+    fan = False
     #print('Stop Temp Loop')
     
 
@@ -45,6 +68,9 @@ def sendMsg(prefix='s-', mess='', suffix=''):
     ser.write(mess.encode("UTF-8")) # on rpi
 
 def main():
+    GPIO.setmode(GPIO.BCM)
+    GPIO.setup(21, GPIO.OUT)
+    GPIO.output(21, GPIO.LOW)
     global _PROCESS
     global _LISTENING
     global _TEMP
@@ -56,7 +82,10 @@ def main():
     while menuInput!='exit':
         print()
         print("1. Send test message.\n0. Exit")
-        menuInput = int(input())
+        try:
+            menuInput = int(input())
+        except:
+            print('-')
         # Close app
         if menuInput == 0:
             sendMsg('','@','')
@@ -72,6 +101,7 @@ def main():
         if menuInput == 1:   
             sendMsg('t-')
 
+    GPIO.output(21, GPIO.LOW)
     print('App closed.')
 
 isConnection = False
