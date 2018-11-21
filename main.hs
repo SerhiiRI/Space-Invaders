@@ -18,7 +18,7 @@ data Setting = Setting { health :: Int
                        , score  :: Int
                        , window :: Vector.Dimension
                        , rndgen :: Random.StdGen
-                       , file_lifes     :: FilePath
+                       , file_DATA      :: FilePath
                        , file_bright    :: FilePath
                        , file_key       :: FilePath
                        } deriving (Show)
@@ -59,7 +59,8 @@ finishGame message _SETTING = do
   putStrLn message
   ANSI.setCursorPosition ((+) 1 $ (Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
   putStrLn $ "Score: " ++ (show $ score _SETTING)
-  usleep 100000
+  --usleep 100000
+  usleep 10000
   finishGame message _SETTING
 
 
@@ -77,9 +78,9 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
   rescanWindowsDimension        <- Vector.parseWindow <$> size
   ANSI.setCursorPosition 0 0
   hFlush stdout
-  --char <- ifReadyDo stdin getChar
-  char <-((readFile (file_key _SETTING)) >>= (\x -> return $ head x))
-  let charM = if (mod iterator 3 == 0 ) then (Just char) else (Nothing)
+  charM <- ifReadyDo stdin getChar
+  --char <-((readFile (file_key _SETTING)) >>= (\x -> return $ head x))
+  -- let charM = if (mod iterator 3 == 0 ) then (Just char) else (Nothing) 
   let (randomValue, newRandomGenerator) = Random.randomR (1, 1000) randomGenerator :: (Int, Random.StdGen)
   let nnewShip =
         userShip
@@ -88,14 +89,12 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
         >>= Ships.intersectEnemyShips enemyShips
   let ewEnemyShips =
         (\x -> x >>= Ships.runAndCleanBullet (mod iterator 3) (+1) (< (Vector.height windowDimension)))
-
         <$> (Ships.addBulletOnEnemyStack (randomValue > 980) newRandomGenerator enemyShips)
   let (new_PI, new_down, nnewEnemyShips) =
         if (mod iterator (compr downTrack downOffset windowOffset) == 0)
         then
            if (let (l, r) = Ships.getShipsLimitersPoint ewEnemyShips; (wl, wr) = (0, Vector.width windowDimension)
                in (or [wl==l, wr==r]))
-
            then (let np = _PI + pi in (np, downOffset+1, Ships.moveEnemyShips (+ (round $ cos np)) (+1) True ewEnemyShips))
            else (_PI, downOffset, Ships.moveEnemyShips (+ (round $ cos _PI)) (id) True ewEnemyShips)
         else (_PI, downOffset, ewEnemyShips)
@@ -110,11 +109,11 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
   Ships.renderEnemyBullets      newEnemyShips rescanWindowsDimension
   Ships.renderAllEnemyShips     newEnemyShips
 
-
-  writeFile  (file_lifes _SETTING) (if (TMaybe.isJust newShip)
-                                    then(show $ Ships.lifes $ TMaybe.fromJust newShip)
-                                    else "0")
-
+  writeFile  (file_DATA _SETTING) (
+    if (TMaybe.isJust newShip)
+    then (show $ ((show $ Ships.lifes $ TMaybe.fromJust newShip)
+                  ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))
+    else (show $ (("0" ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))))
   ANSI.setCursorPosition 1 25
   bright <- readFile      (file_bright _SETTING)
   putStr $ "Bright:" ++ bright
@@ -167,6 +166,9 @@ main = do
   -- let fileLifes         = arg !! 0
   -- let fileBright        = arg !! 1
   -- let fileKey           = arg !! 2
+  let fileDATA          = "./DATA"
+  let fileBright        = "./bright"
+  let fileKey           = "./key"
 
   putStr ANSI.hideCursorCode
   ANSI.clearScreen
@@ -177,9 +179,9 @@ main = do
                               , score=0
                               , window=(Vector.Dimension 0 0)
                               , rndgen=(Random.mkStdGen 12341234)
-                              , file_lifes="./lifes"
-                              , file_bright="./bright"
-                              , file_key="./key"
+                              , file_DATA=fileDATA
+                              , file_bright=fileBright
+                              , file_key=fileKey
                               }
   catch (level startSettings) handler
   putStrLn ANSI.showCursorCode

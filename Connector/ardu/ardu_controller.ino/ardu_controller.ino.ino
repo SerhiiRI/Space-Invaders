@@ -132,9 +132,10 @@ void BtnPressTest(int x){
 
 // for ReadKeyboard()
 void pressBtn(int x){
-    BtnPressTest(led[x]);
+    //BtnPressTest(led[x]);
     Serial.println("b-" + String(key[x])); // b- send button syntax
     delay(50);
+    Serial.println("b-"); // b- send button syntax
 }
 
 // Used to read button and send emulated keboard key.

@@ -5,16 +5,34 @@ import sys
 from multiprocessing.pool import ThreadPool
 import psutil
 import RPi.GPIO as GPIO
+import Adafruit_CharLCD as LCD
 
 _PROCESS=True #if True then multiprocessing run
 _LISTENING = True #Listening serial port
 _TEMP=True #Get update cpu temperature
+# Raspberry Pi pin configuration:
+lcd_rs        = 25#= 22  # Note this might need to be changed to 21 for older revision Pi's.
+lcd_en        = 24#= 18
+lcd_d4        = 23#= 16
+lcd_d5        = 17#= 12
+lcd_d6        = 18#= 13
+lcd_d7        = 22#= 15
+lcd_backlight = 2
+
+# Define LCD column and row size for 16x2 LCD.
+lcd_columns = 16
+lcd_rows    = 2
+
+# Initialize the LCD using the pins above.
+_lcd = LCD.Adafruit_CharLCD(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7,
+                               lcd_columns, lcd_rows, lcd_backlight)
+    
+
 
 def readArdu():
     global _LISTENING
     global _PROCESS
     print(">>Start Listening.")
-    info = [0,0]
     data = ''
     while _PROCESS:
         #  on rpi
@@ -25,15 +43,14 @@ def readArdu():
                     mode = data[0]+data[1]
                     if(mode=='s-'):
                         print('>>Light: {}'.format(data[2]))
-                        open('ligth.txt','w').write(data[2])
+                        open('../bright','w').write(data[2])
                     elif(mode=='b-'):
                         print('>>Button Down: {}'.format(data[2]))
-                        open('btn.txt','w').write(data[2])
+                        open('../key','w').write(data[2])
                         #print('>>Button Down: {}'.format(open('btn.txt').read()))
                 data = ''
             else:
                 data = data + tmp[2]
-            
         
     _LISTENING = False
     #print('Stop Listening')
@@ -41,13 +58,53 @@ def readArdu():
     
     
 def readTemp():
+    global _lcd
     global _TEMP
     global _PROCESS
+    global _lcd
     fan = False
     maxTemp = 50
-        
+    info = [0,0,0]
+    first = True
+    
     print(">>Start Temp Reading.")
     while _PROCESS:
+        
+        try:
+            filedata = open('../DATA').read()
+        except:
+            filedata = '3;0;33'
+        
+        filedata = filedata.split(';')
+        
+        if first:
+            info[0]=filedata[0]
+            info[1]=filedata[1]
+            info[2]=filedata[2]
+            
+        if info[0] != filedata[0] or first:
+            info[0] = filedata[0] #life
+            if info[0] == 3:
+                sendMsg('l-','123')
+            if info[0] == 2:
+                sendMsg('l-','1')
+            if info[0] == 1:
+                sendMsg('l-','2')
+            if info[0] == 0:
+                sendMsg('l-','3')
+                sendMsg('t-')
+                
+        if info[1] != filedata[1] or first:
+            info[1] = filedata[1] #score
+            _lcd.clear()
+            _lcd.message('Score: {}\nEnemies: {}'.format(info[1],info[2]))
+            
+        if info[2] != filedata[2] or first:
+            info[2] = filedata[2] #enemies
+            _lcd.clear()
+            _lcd.message('Score: {}\nEnemies: {}'.format(info[1],info[2]))
+        
+        first = False
         time.sleep(3)
         temp = psutil.sensors_temperatures()
         temp = temp['cpu-thermal']
@@ -69,11 +126,13 @@ def readTemp():
 def sendMsg(prefix='s-', mess='', suffix=''):
     mess = str(prefix) + str(mess) + str(suffix)
     ser.write(mess.encode("UTF-8")) # on rpi
+    
 
 def main():
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(21, GPIO.OUT)
     GPIO.output(21, GPIO.LOW)
+    
     global _PROCESS
     global _LISTENING
     global _TEMP
@@ -81,6 +140,10 @@ def main():
     pool2 = ThreadPool(processes=2)
     pool1.apply_async(readArdu)
     pool2.apply_async(readTemp)
+    
+    _lcd.clear()
+    _lcd.message('Run the game!')
+    
     menuInput = ''
     while menuInput!='exit':
         print()
@@ -106,6 +169,10 @@ def main():
 
     GPIO.output(21, GPIO.LOW)
     print('App closed.')
+    _lcd.clear()
+    _lcd.message('App closed.')
+    time.sleep(2.0)
+    _lcd.clear()
 
 isConnection = False
 
