@@ -245,6 +245,15 @@ renderLifeCountM (Just ship@(Ship {lifes=countLifes})) terminalWindowsDimension 
   ANSI.setCursorPosition 1 ((subtract 15) (width terminalWindowsDimension))
   putStr $ "Lifies: " ++ (show $ countLifes)
 
+colorize :: String -> IO ()
+colorize text = do
+  setSGR [SetColor Foreground Vivid Red]
+  setSGR [SetColor Background Vivid Blue]
+  putStr text
+  setSGR [Reset]
+
+
+
 -- | runAndCleanBullet - function
 runAndCleanBullet :: Int -> (Int -> Int) -> (Int -> Bool) -> Ship -> Maybe Ship
 runAndCleanBullet f func fpredicate ship@(Ship {bullets=[]}) = Just ship
@@ -254,3 +263,8 @@ runAndCleanBullet f func fpredicate ship@(Ship {bullets=bulletsList}) = Just shi
       | (f /= 0) = (Bullet {getBullet=(Point {x=nx, y=(ny)})}) : newBulletsList
       | (fpredicate ny) = (Bullet {getBullet=(Point {x=nx, y=(func ny)})}) : newBulletsList
       | otherwise = (newBulletsList)
+
+
+
+
+
