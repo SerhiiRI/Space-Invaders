@@ -144,10 +144,15 @@ void pressBtn(int x){
 
 // Used to read button and send emulated keboard key.
 void ReadKeyboard(){
+  /*
   if(digitalRead(btn[0])==0){pressBtn(0); info[2]=true;}
   else if(digitalRead(btn[1])==0){pressBtn(1); info[2]=true;}
   else if(digitalRead(btn[2])==0){pressBtn(2); info[2]=true;}
   else{if(info[2]){pressBtn(3); info[2]=false;}}
+  */
+  if(digitalRead(btn[0])==0){pressBtn(0);}
+  else if(digitalRead(btn[1])==0){pressBtn(1);}
+  else if(digitalRead(btn[2])==0){pressBtn(2);}
 }
 
 //Reset to default set

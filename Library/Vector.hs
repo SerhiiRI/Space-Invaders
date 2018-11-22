@@ -2,13 +2,13 @@ module Library.Vector
   ( Point(..)
   , Dimension(..)
   , X
-  , Y
-  
+  , Y  
   , parseWindow
+  , clearScreenToBegin
   , textIntro
   , isCompatibleWindow
 )where
-import System.Console.ANSI as ANSI
+import qualified System.Console.ANSI as ANSI
 import qualified System.Console.Terminal.Size as Size
 
 type X = Int
@@ -23,14 +23,24 @@ instance Eq Dimension where
 parseWindow :: Maybe (Size.Window Int) -> Dimension
 parseWindow (Nothing) = (Dimension {height=0, width=0})
 parseWindow (Just (Size.Window {Size.height = h, Size.width = w}))
-  | and [w > 80, h > 45]                = (Dimension {height=h, width=w})
+  | and [w > 80, h > 40]                = (Dimension {height=h, width=w})
   | otherwise                           = (Dimension {height=0, width=0})
 
 isCompatibleWindow :: Dimension -> Bool
 isCompatibleWindow (Dimension h w) = not $ h==w && h==0
 
 
-textIntro :: (X, Y) ->  IO ()
+clearScreenToBegin :: (X, Y) -> IO()
+clearScreenToBegin (0, 0) = putStr ""
+clearScreenToBegin (x, y) = ANSI.setCursorPosition x y >> ANSI.clearFromCursorToScreenBeginning
+
+
+-- textFinal :: (X, Y) -> String -> IO ()
+-- textFinal (xpoint, ypoint) message = do
+--   let ship = []
+--         ++ 
+
+textIntro :: (X, Y) -> IO ()
 textIntro (xpoint, ypoint) = do
   let space = []
         ++ ["  ____  "]
@@ -45,19 +55,21 @@ textIntro (xpoint, ypoint) = do
         ++ ["  | || '_ \\ \\ / / _` |/ _` |/ _ \\ '__/ __| "]
         ++ ["  | || | | \\ V / (_| | (_| |  __/ |  \\__ \\ "]
         ++ [" |___|_| |_|\\_/ \\__,_|\\__,_|\\___|_|  |___/ "]
-  let by = ["by"]
-  let authorA = ["    SerhiiRi"]
-  let authorB = ["    Morfeu5z"]
-  let p1 = ["--{ press S to Start the Game }--"]
-  let p2 = ["     --{ or L for Leave }--      "]
-  let p3 = ["          --{ EOF }--            "]
+  let by =              ["by"]
+  let authorA =         ["    SerhiiRi"]
+  let authorB =         ["    Morfeu5z"]
+  let hint1 =           ["    Shoot [J] Moving [A]-[D]    "]
+  let p1 =              ["--{ press A to Start the Game }--"]
+  let p2 =              ["     --{ or D for Leave }--      "]
+  let p3 =              ["          --{ EOF }--            "]
   let _000L   = 0
   let _001L   = length space
   let _002L   = (+) (_001L + 2) $ length invaders 
   let _003L   = (+) _002L 1
   let _004L   = (+) _003L 1
   -- real menu
-  let _005L   = (+) _004L 5
+  let _015L   = (+) _004L 5
+  let _005L   = (+) _015L 2
   let _006L   = (+) _005L 2
   let _007L   = (+) _006L 2
   let _001H   = (length $ head invaders) - (length $ head authorA) -1
@@ -65,11 +77,12 @@ textIntro (xpoint, ypoint) = do
   drowing   ANSI.Red         6       _000L      space
   drowing   ANSI.Cyan        0       _001L      invaders
   drowing   ANSI.Red         _001H   _002L      by
-  drowing   ANSI.Cyan         _001H   _003L      authorA
-  drowing   ANSI.Cyan         _001H   _004L      authorB
-  drowing   ANSI.White         _002H   _005L      p1
-  drowing   ANSI.White         _002H   _006L      p2
-  drowing   ANSI.White         _002H   _007L      p3
+  drowing   ANSI.Cyan        _001H   _003L      authorA
+  drowing   ANSI.Cyan        _001H   _004L      authorB
+  drowing   ANSI.Red         _002H   _015L      hint1
+  drowing   ANSI.White       _002H   _005L      p1
+  drowing   ANSI.White       _002H   _006L      p2
+  drowing   ANSI.White       _002H   _007L      p3
   where
     drowing :: ANSI.Color -> X -> Y -> [String] -> IO ()
     drowing color offsetX offsetY [] = putStr ""
@@ -77,8 +90,8 @@ textIntro (xpoint, ypoint) = do
       ANSI.setCursorPosition (ypoint+offsetY) (xpoint+offsetX)
       colorize str color
       drowing color offsetX (offsetY+1) strings
-    colorize :: String -> Color -> IO ()
+    colorize :: String -> ANSI.Color -> IO ()
     colorize text color = do
-      setSGR [SetColor Foreground Vivid color]
+      ANSI.setSGR [ANSI.SetColor ANSI.Foreground ANSI.Vivid color]
       putStr text
-      setSGR [Reset]
+      ANSI.setSGR [ANSI.Reset]

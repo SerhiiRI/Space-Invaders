@@ -6,7 +6,11 @@ from multiprocessing.pool import ThreadPool
 import psutil
 import RPi.GPIO as GPIO
 import Adafruit_CharLCD as LCD
+#from pynput.keyboard import Key, Controller
+import os
+import subprocess
 
+#_keyboard = Controller()
 _PROCESS=True #if True then multiprocessing run
 _LISTENING = True #Listening serial port
 _TEMP=True #Get update cpu temperature
@@ -38,6 +42,7 @@ def sendMsg(prefix='s-', mess='', suffix=''):
 def readArdu():
     global _LISTENING
     global _PROCESS
+    #global _keyboard
     tmpKey =''
     tmpBright = ''
     data = ''
@@ -55,17 +60,22 @@ def readArdu():
                         try:
                             if tmpBright != data[2]:
                                 tmpBright = data[2]
-                                open('../bright','w').write(data[2])
+                                open('bright','w').write(data[2])
                         except:
                             print('Open faild')
                     elif(mode=='b-'):
                         #print('>>Key: {}'.format(data[2]))
                         try:
+                            '''
                             if tmpKey != data[2]:
                                 tmpKey = data[2]
-                                open('../key','w').write(data[2])
+                                #open('key','w').write(data[2])
+                               '''
+                            #_keyboard.press(data[2])
+                            #_keyboard.release(data[2])
+                            os.system('xdotool key {}'.format(data[2]))
                         except:
-                            print('Open faild')
+                            print('Press faild')
                 data = ''
             else:
                 data = data + tmp[2]
@@ -90,7 +100,12 @@ def readTemp():
     print(">>Start Temp Reading.")
     while _PROCESS:
         try:
-            filedata = open('../DATA').read()
+            filedata = open('DATA').read()
+            '''
+            if open('gamestatus').read() == '0':
+                os.system('xdotool key 0')
+                os.system('xdotool key Return')
+                '''
         except:
             filedata = '0;0;0'
         
@@ -149,7 +164,9 @@ def readTemp():
         if life:
             _lcd.message('Life: {}  T:{}\nEnemies: {}'.format(life,temp,info[2]))
         else:
+            life = -1
             _lcd.message('Game Over\nYour Score: {}'.format(info[1]))
+            time.sleep(5)
         sendMsg('p-','')
         time.sleep(2)
         
@@ -169,6 +186,15 @@ def main():
     pool2 = ThreadPool(processes=2)
     pool1.apply_async(readArdu)
     pool2.apply_async(readTemp)
+    
+    os.system('xdotool key ctrl+alt+t')
+    time.sleep(1)
+    path = os.getcwd()
+    os.system('xdotool type \'cd {}\''.format(path))
+    os.system('xdotool key Return')
+    os.system('xdotool type \'python3 si_run.py\'')
+    os.system('xdotool key Return')
+    open('gamestatus','w').write('1')
     
     _lcd.clear()
     _lcd.message('Run the game!')

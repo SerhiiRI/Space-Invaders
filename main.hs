@@ -35,12 +35,6 @@ ifReadyDo hnd x = hReady hnd >>= f
    where f True = x >>= return . Just
          f _    = return Nothing
 
-ifReadyDo' :: Handle -> (Handle -> IO a) -> IO (Maybe a)
-ifReadyDo' hnd x = hReady hnd >>= f
-   where f True = x hnd >>= return . Just
-         f _    = return Nothing
-
-
 keyboardController :: Vector.Dimension -> Maybe Char -> Ships.Ship -> Maybe Ships.Ship
 keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
         | myChar == Just 'a'   = Just ( (Ships.point gamerShip) `inSection` (subtract 2))
@@ -101,6 +95,8 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
 
 
   let colorGamer = if(newShip == userShip) then ANSI.Red else ANSI.Cyan
+  if (newShip == userShip) then putStr "" else usleep 500
+
   Ships.renderShipM             colorGamer newShip
   Ships.renderGamerBullets      newShip
   Ships.renderBulletCountM      newShip
@@ -115,18 +111,9 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
     then (((show $ Ships.lifes $ TMaybe.fromJust newShip)
                   ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))
     else ((("0" ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))))
-  ANSI.setCursorPosition 1 25
-  bright <- readFile      (file_bright _SETTING)
-  putStr $ "Bright:" ++ bright
-
-  ANSI.setCursorPosition 1 45
-  key <- readFile      (file_key _SETTING)
-  putStr $ "Presd:" ++ key
-
 
   let n_LOOP = _LOOP { down=new_down, cospi=new_PI, animSTG=newAnimSTG, counter=(if | iterator == 10000  -> 0 | otherwise -> iterator +1) }
-  --usleep 5000
-  usleep 9000
+  usleep 10000
   case () of
     _ | and [TMaybe.isJust newShip, not $ null newEnemyShips]-> (mainLoop n_LOOP (_SETTING {window=(rescanWindowsDimension), rndgen=newRandomGenerator}) newShip newEnemyShips)
     _ | and [TMaybe.isNothing newShip, not $ null newEnemyShips] -> finishGame "You lose! ha-ha!" _SETTING
@@ -161,14 +148,7 @@ level startUpSetting = do
     genr (Vector.Dimension {Vector.height=xheight, Vector.width=xwidth})
       = (Vector.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
 
-
-
-
-  
-
-
-
-main = do
+menu = do
   -- arg <- getArgs
   -- if (length arg < 3) then exitSuccess
   --   else putStr ""
@@ -178,9 +158,7 @@ main = do
   let fileDATA          = "./DATA"
   let fileBright        = "./bright"
   let fileKey           = "./key"
-
   putStr ANSI.hideCursorCode
-  ANSI.clearScreen
   old <-hGetEcho stdin
   hSetEcho stdin False
   windowDimension        <- Vector.parseWindow <$> size
@@ -193,39 +171,19 @@ main = do
                               , file_bright=fileBright
                               , file_key=fileKey
                               }
-  catch (level startSettings) handler
-  --level startSettings
-  putStrLn ANSI.showCursorCode
-  putStr ANSI.clearFromCursorToScreenEndCode
-  putStr ANSI.clearFromCursorToScreenBeginningCode
-  ANSI.setCursorPosition 0 0
-  ANSI.setSGR [ANSI.Reset]
-  where
-    handler :: SomeException -> IO ()
-    handler e = putStrLn $ ANSI.showCursorCode
-
-
-
-
-type ErrorMessage = [String]
-printHelp :: IO ()
-printHelp = putStrLn $ "usage: si\n"
-          ++ "Space Invader the console emulator of Atari game.\n"
-          ++ "list of arguments:\n"
-          ++ "\thelp\t\tshow this message\n"
-          ++ "\t/<path>/lifes\t\toutput game file"
-          ++ "\t/<path>/bright\t\tinput file for ship color"
-          ++ "\t/<path>/key\t\tsystem for replace with keyboard interruption"
-
-menu :: IO ()
-menu = do
   putStr ANSI.clearFromCursorToScreenBeginningCode
   putStr ANSI.clearFromCursorToScreenEndCode
   ANSI.setCursorPosition 0 0
   window <- Vector.parseWindow <$> size
   Vector.textIntro (center window)
-  putStrLn ""
+  controlKey <- getChar
+  if | controlKey `elem` ['a', 'A'] -> Vector.clearScreenToBegin (Vector.height windowDimension, Vector.width windowDimension) >> catch (level startSettings) handler >> main
+     | controlKey `elem` ['d', 'D'] -> exit
+     | otherwise -> main
+  exit
   where
+    handler :: SomeException -> IO ()
+    handler e = putStrLn $ ANSI.showCursorCode
     center :: Vector.Dimension -> (Vector.X, Vector.Y)
     center wind =
       (
@@ -234,6 +192,19 @@ menu = do
        then (((Vector.height wind) `div` 2)  -  (div 28 2 ))
        else (0) )
       )
+
+exit :: IO ()
+exit = do
+  putStrLn ANSI.showCursorCode
+  putStr ANSI.clearFromCursorToScreenEndCode
+  putStr ANSI.clearFromCursorToScreenBeginningCode
+  ANSI.setCursorPosition 0 0
+  ANSI.setSGR [ANSI.Reset]
+
+main = catch menu handler
+  where
+    handler :: SomeException -> IO ()
+    handler _ = exit
 
 finishGame :: String -> Setting -> IO ()
 finishGame message _SETTING = do
@@ -244,12 +215,8 @@ finishGame message _SETTING = do
   putStrLn message
   ANSI.setCursorPosition ((+) 1 $ (Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
   putStrLn $ "Score: " ++ (show $ score _SETTING)
-  --usleep 100000
-  usleep 100000
-  finishGame message _SETTING
+  _ <- getChar
+  putStrLn ""
+  
 
 
-printError :: ErrorMessage -> IO ()
-printError errorList = putStrLn $ " ** Error * "
-                     ++ (concat $ map ("\n -> " ++ ) errorList)
-                     ++ " -* end *- "
