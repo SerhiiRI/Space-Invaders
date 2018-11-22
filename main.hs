@@ -21,11 +21,11 @@ data Setting = Setting { health :: Int
                        , file_DATA      :: FilePath
                        , file_bright    :: FilePath
                        , file_key       :: FilePath
-                       --, color          :: ANSI.Color
                        } deriving (Show)
 
 data LoopSetting = LoopSetting { counter    :: Int
                                , cospi      :: Float
+                               , animSTG    :: Int
                                , track      :: Int
                                , down       :: Int
                                } deriving (Show)
@@ -56,52 +56,30 @@ keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
                                                                   )
                                                               }
 
-finishGame :: String -> Setting -> IO ()
-finishGame message _SETTING = do
-  putStr ANSI.clearFromCursorToScreenBeginningCode
-  putStr ANSI.clearFromCursorToScreenEndCode
-  window <- Vector.parseWindow <$> size
-  ANSI.setCursorPosition ((Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
-  putStrLn message
-  ANSI.setCursorPosition ((+) 1 $ (Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
-  putStrLn $ "Score: " ++ (show $ score _SETTING)
-  --usleep 100000
-  usleep 100000
-  finishGame message _SETTING
-
-
-
 mainLoop :: LoopSetting -> Setting -> Maybe Ships.Ship -> [Maybe Ships.Ship] -> IO ()
 mainLoop _LOOP _SETTING userShip enemyShips = do
   let iterator                  = counter       _LOOP
   let _PI                       = cospi         _LOOP
   let downOffset                = down          _LOOP
   let downTrack                 = track         _LOOP
-
+  let animCount                 = length        Ships.defaultShip
   let windowOffset              = offset        _SETTING
   let windowDimension           = window        _SETTING
   let randomGenerator           = rndgen        _SETTING
+  let newAnimSTG                = if ((mod iterator 8) /= 0) then animSTG _LOOP else (+) 1 $ animSTG _LOOP
+  key   <- readFile  (file_key  _SETTING)
+  colorEnemies <- ((readFile (file_bright _SETTING)) >>= \x -> return $ if ((read x) == 0) then ANSI.Red else ANSI.Cyan)
+
   rescanWindowsDimension        <- Vector.parseWindow <$> size
   ANSI.setCursorPosition 0 0
   hFlush stdout
-  file <- openFile (file_key _SETTING) ReadMode
-  result <- try (ifReadyDo' file hGetChar):: IO (Either IOException (Maybe Char) )
-  let charM = case result of
-         (Left val) -> Nothing
-         (Right val) -> val
-
-  -- charM <- ifReadyDo stdin getChar
-  
-  -- result <- try ((readFile (file_key _SETTING) >>= \cas -> return $ cas !! 0) ) :: IO (Either IOException Char)
+  -- file <- openFile (file_key _SETTING) ReadMode
+  -- result <- try (ifReadyDo' file hGetChar):: IO (Either IOException (Maybe Char) )
   -- let charM = case result of
-  --        (Left val) -> (Nothing)
-  --        (Right val) -> (Just val)
-  
+  --        (Left val) -> Nothing
+  --        (Right val) -> val
 
-  -- let charM = if (mod iterator 2 == 0 ) then (Just char) else (Nothing)
-        --let charM = if (True ) then (Just char) else (Nothing)
-  -- char <- ((getEnv "KEY") >>= (\x -> return $ head x))
-  -- let charM = if (True ) then (Just char) else (Nothing)
+  charM <- ifReadyDo stdin getChar
   let (randomValue, newRandomGenerator) = Random.randomR (1, 1000) randomGenerator :: (Int, Random.StdGen)
   let nnewShip =
         userShip
@@ -121,14 +99,16 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
         else (_PI, downOffset, ewEnemyShips)
   let (newShip, newEnemyShips, toEreasing)  = Ships.killing nnewEnemyShips nnewShip
 
-  Ships.renderShipM             newShip
+
+  let colorGamer = if(newShip == userShip) then ANSI.Red else ANSI.Cyan
+  Ships.renderShipM             colorGamer newShip
   Ships.renderGamerBullets      newShip
   Ships.renderBulletCountM      newShip
   Ships.renderLifeCountM        newShip rescanWindowsDimension
   Ships.clearBetweenEnemyShips  enemyShips
   Ships.clearEnemyShips         toEreasing
   Ships.renderEnemyBullets      newEnemyShips rescanWindowsDimension
-  Ships.renderAllEnemyShips     newEnemyShips
+  Ships.renderAllEnemyShips     colorEnemies (mod newAnimSTG animCount) newEnemyShips
 
   writeFile  (file_DATA _SETTING) (
     if (TMaybe.isJust newShip)
@@ -144,9 +124,9 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
   putStr $ "Presd:" ++ key
 
 
-  let n_LOOP = _LOOP { down=new_down, cospi=new_PI, counter=(if | iterator == 10000  -> 0 | otherwise -> iterator +1) }
+  let n_LOOP = _LOOP { down=new_down, cospi=new_PI, animSTG=newAnimSTG, counter=(if | iterator == 10000  -> 0 | otherwise -> iterator +1) }
   --usleep 5000
-  usleep 10000
+  usleep 9000
   case () of
     _ | and [TMaybe.isJust newShip, not $ null newEnemyShips]-> (mainLoop n_LOOP (_SETTING {window=(rescanWindowsDimension), rndgen=newRandomGenerator}) newShip newEnemyShips)
     _ | and [TMaybe.isNothing newShip, not $ null newEnemyShips] -> finishGame "You lose! ha-ha!" _SETTING
@@ -172,6 +152,7 @@ level startUpSetting = do
         }
   let loopSetting = LoopSetting { counter       = 0
                                 , cospi         = pi
+                                , animSTG       = 3
                                 , down          = 0
                                 , track         = (if ((Vector.height windowDimension) > (Vector.width windowDimension)) then 14 else 10) }
   let enemyMatrix               = concat $ Ships.createEnemyShipTemplate (offset startUpSetting) windowDimension
@@ -179,6 +160,12 @@ level startUpSetting = do
   where
     genr (Vector.Dimension {Vector.height=xheight, Vector.width=xwidth})
       = (Vector.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
+
+
+
+
+  
+
 
 
 main = do
@@ -206,15 +193,18 @@ main = do
                               , file_bright=fileBright
                               , file_key=fileKey
                               }
-  --catch (level startSettings) handler
-  level startSettings
+  catch (level startSettings) handler
+  --level startSettings
   putStrLn ANSI.showCursorCode
   putStr ANSI.clearFromCursorToScreenEndCode
   putStr ANSI.clearFromCursorToScreenBeginningCode
   ANSI.setCursorPosition 0 0
+  ANSI.setSGR [ANSI.Reset]
   where
     handler :: SomeException -> IO ()
     handler e = putStrLn $ ANSI.showCursorCode
+
+
 
 
 type ErrorMessage = [String]
@@ -227,7 +217,36 @@ printHelp = putStrLn $ "usage: si\n"
           ++ "\t/<path>/bright\t\tinput file for ship color"
           ++ "\t/<path>/key\t\tsystem for replace with keyboard interruption"
 
+menu :: IO ()
+menu = do
+  putStr ANSI.clearFromCursorToScreenBeginningCode
+  putStr ANSI.clearFromCursorToScreenEndCode
+  ANSI.setCursorPosition 0 0
+  window <- Vector.parseWindow <$> size
+  Vector.textIntro (center window)
+  putStrLn ""
+  where
+    center :: Vector.Dimension -> (Vector.X, Vector.Y)
+    center wind =
+      (
+      (((Vector.width wind) `div` 2)  -  (div 48 2 )),
+      (if ((Vector.height wind) >= 28)
+       then (((Vector.height wind) `div` 2)  -  (div 28 2 ))
+       else (0) )
+      )
 
+finishGame :: String -> Setting -> IO ()
+finishGame message _SETTING = do
+  putStr ANSI.clearFromCursorToScreenBeginningCode
+  putStr ANSI.clearFromCursorToScreenEndCode
+  window <- Vector.parseWindow <$> size
+  ANSI.setCursorPosition ((Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
+  putStrLn message
+  ANSI.setCursorPosition ((+) 1 $ (Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
+  putStrLn $ "Score: " ++ (show $ score _SETTING)
+  --usleep 100000
+  usleep 100000
+  finishGame message _SETTING
 
 
 printError :: ErrorMessage -> IO ()
