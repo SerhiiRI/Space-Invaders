@@ -16,8 +16,7 @@ instance Eq Dimension where
 parseWindow :: Maybe (Size.Window Int) -> Dimension
 parseWindow (Nothing) = (Dimension {height=0, width=0})
 parseWindow (Just (Size.Window {Size.height = h, Size.width = w}))
-  | and [w > 80, w < 140, h > 45]       = (Dimension {height=h, width=w})
-  | and [w > 140, h > 45]               = (Dimension {height=h, width=140})
+  | and [w > 80, h > 45]                = (Dimension {height=h, width=w})
   | otherwise                           = (Dimension {height=0, width=0})
 
 isCompatibleWindow :: Dimension -> Bool

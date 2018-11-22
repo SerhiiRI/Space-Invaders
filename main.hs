@@ -4,7 +4,7 @@ import System.Console.ANSI as ANSI
 import System.Console.Terminal.Size
 import System.IO
 import System.Posix.Unistd
-import System.Environment
+import System.Environment (getEnv)
 import System.Exit
 import Control.Exception
 import qualified Data.Maybe as TMaybe (isNothing, isJust, fromJust)
@@ -21,8 +21,8 @@ data Setting = Setting { health :: Int
                        , file_DATA      :: FilePath
                        , file_bright    :: FilePath
                        , file_key       :: FilePath
+                       --, color          :: ANSI.Color
                        } deriving (Show)
-
 
 data LoopSetting = LoopSetting { counter    :: Int
                                , cospi      :: Float
@@ -34,6 +34,12 @@ ifReadyDo :: Handle -> IO a -> IO (Maybe a)
 ifReadyDo hnd x = hReady hnd >>= f
    where f True = x >>= return . Just
          f _    = return Nothing
+
+ifReadyDo' :: Handle -> (Handle -> IO a) -> IO (Maybe a)
+ifReadyDo' hnd x = hReady hnd >>= f
+   where f True = x hnd >>= return . Just
+         f _    = return Nothing
+
 
 keyboardController :: Vector.Dimension -> Maybe Char -> Ships.Ship -> Maybe Ships.Ship
 keyboardController (Vector.Dimension xhei xwid) myChar gamerShip
@@ -60,7 +66,7 @@ finishGame message _SETTING = do
   ANSI.setCursorPosition ((+) 1 $ (Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
   putStrLn $ "Score: " ++ (show $ score _SETTING)
   --usleep 100000
-  usleep 10000
+  usleep 100000
   finishGame message _SETTING
 
 
@@ -78,9 +84,24 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
   rescanWindowsDimension        <- Vector.parseWindow <$> size
   ANSI.setCursorPosition 0 0
   hFlush stdout
-  charM <- ifReadyDo stdin getChar
-  --char <-((readFile (file_key _SETTING)) >>= (\x -> return $ head x))
-  -- let charM = if (mod iterator 3 == 0 ) then (Just char) else (Nothing) 
+  file <- openFile (file_key _SETTING) ReadMode
+  result <- try (ifReadyDo' file hGetChar):: IO (Either IOException (Maybe Char) )
+  let charM = case result of
+         (Left val) -> Nothing
+         (Right val) -> val
+
+  -- charM <- ifReadyDo stdin getChar
+  
+  -- result <- try ((readFile (file_key _SETTING) >>= \cas -> return $ cas !! 0) ) :: IO (Either IOException Char)
+  -- let charM = case result of
+  --        (Left val) -> (Nothing)
+  --        (Right val) -> (Just val)
+  
+
+  -- let charM = if (mod iterator 2 == 0 ) then (Just char) else (Nothing)
+        --let charM = if (True ) then (Just char) else (Nothing)
+  -- char <- ((getEnv "KEY") >>= (\x -> return $ head x))
+  -- let charM = if (True ) then (Just char) else (Nothing)
   let (randomValue, newRandomGenerator) = Random.randomR (1, 1000) randomGenerator :: (Int, Random.StdGen)
   let nnewShip =
         userShip
@@ -111,9 +132,9 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
 
   writeFile  (file_DATA _SETTING) (
     if (TMaybe.isJust newShip)
-    then (show $ ((show $ Ships.lifes $ TMaybe.fromJust newShip)
+    then (((show $ Ships.lifes $ TMaybe.fromJust newShip)
                   ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))
-    else (show $ (("0" ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))))
+    else ((("0" ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))))
   ANSI.setCursorPosition 1 25
   bright <- readFile      (file_bright _SETTING)
   putStr $ "Bright:" ++ bright
@@ -124,6 +145,7 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
 
 
   let n_LOOP = _LOOP { down=new_down, cospi=new_PI, counter=(if | iterator == 10000  -> 0 | otherwise -> iterator +1) }
+  --usleep 5000
   usleep 10000
   case () of
     _ | and [TMaybe.isJust newShip, not $ null newEnemyShips]-> (mainLoop n_LOOP (_SETTING {window=(rescanWindowsDimension), rndgen=newRandomGenerator}) newShip newEnemyShips)
@@ -151,7 +173,7 @@ level startUpSetting = do
   let loopSetting = LoopSetting { counter       = 0
                                 , cospi         = pi
                                 , down          = 0
-                                , track         = 12}
+                                , track         = (if ((Vector.height windowDimension) > (Vector.width windowDimension)) then 14 else 10) }
   let enemyMatrix               = concat $ Ships.createEnemyShipTemplate (offset startUpSetting) windowDimension
   mainLoop loopSetting startUpSetting userShips enemyMatrix
   where
@@ -174,7 +196,8 @@ main = do
   ANSI.clearScreen
   old <-hGetEcho stdin
   hSetEcho stdin False
-  let startSettings = Setting { offset=0
+  windowDimension        <- Vector.parseWindow <$> size
+  let startSettings = Setting { offset=(if ((Vector.height windowDimension) > (Vector.width windowDimension)) then 4 else 0)
                               , health=3
                               , score=0
                               , window=(Vector.Dimension 0 0)
@@ -183,7 +206,8 @@ main = do
                               , file_bright=fileBright
                               , file_key=fileKey
                               }
-  catch (level startSettings) handler
+  --catch (level startSettings) handler
+  level startSettings
   putStrLn ANSI.showCursorCode
   putStr ANSI.clearFromCursorToScreenEndCode
   putStr ANSI.clearFromCursorToScreenBeginningCode

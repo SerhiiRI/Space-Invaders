@@ -29,31 +29,49 @@ _lcd = LCD.Adafruit_CharLCD(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7,
     
 
 
+def sendMsg(prefix='s-', mess='', suffix=''):
+    mess = str(prefix) + str(mess) + str(suffix)
+    ser.write(mess.encode("UTF-8")) # on rpi
+    #print('>{}'.format(mess))
+    
+
 def readArdu():
     global _LISTENING
     global _PROCESS
-    print(">>Start Listening.")
+    tmpKey =''
+    tmpBright = ''
     data = ''
+    print(">>Start Listening.")
     while _PROCESS:
         #  on rpi
+        time.sleep(0.003)
         if ser.inWaiting()>0:
             tmp = str(ser.read())
             if tmp[2]=='\\':
                 if data:
                     mode = data[0]+data[1]
                     if(mode=='s-'):
-                        print('>>Light: {}'.format(data[2]))
-                        open('../bright','w').write(data[2])
+                        #print('>>Bright: {}'.format(data[2]))
+                        try:
+                            if tmpBright != data[2]:
+                                tmpBright = data[2]
+                                open('../bright','w').write(data[2])
+                        except:
+                            print('Open faild')
                     elif(mode=='b-'):
-                        print('>>Button Down: {}'.format(data[2]))
-                        open('../key','w').write(data[2])
-                        #print('>>Button Down: {}'.format(open('btn.txt').read()))
+                        #print('>>Key: {}'.format(data[2]))
+                        try:
+                            if tmpKey != data[2]:
+                                tmpKey = data[2]
+                                open('../key','w').write(data[2])
+                        except:
+                            print('Open faild')
                 data = ''
             else:
                 data = data + tmp[2]
         
     _LISTENING = False
-    #print('Stop Listening')
+    print('Stop Listening')
     ser.close()
     
     
@@ -63,49 +81,59 @@ def readTemp():
     global _PROCESS
     global _lcd
     fan = False
+    life = 0
     maxTemp = 50
-    info = [0,0,0]
-    first = True
+    info = ['0','0','0']
+    sendMsg('t-')
+    time.sleep(0.7)
     
     print(">>Start Temp Reading.")
     while _PROCESS:
-        
         try:
             filedata = open('../DATA').read()
         except:
-            filedata = '3;0;33'
+            filedata = '0;0;0'
         
         filedata = filedata.split(';')
-        
-        if first:
-            info[0]=filedata[0]
-            info[1]=filedata[1]
-            info[2]=filedata[2]
-            
-        if info[0] != filedata[0] or first:
-            info[0] = filedata[0] #life
-            if info[0] == 3:
-                sendMsg('l-','123')
-            if info[0] == 2:
-                sendMsg('l-','1')
-            if info[0] == 1:
-                sendMsg('l-','2')
-            if info[0] == 0:
-                sendMsg('l-','3')
-                sendMsg('t-')
-                
-        if info[1] != filedata[1] or first:
-            info[1] = filedata[1] #score
-            _lcd.clear()
-            _lcd.message('Score: {}\nEnemies: {}'.format(info[1],info[2]))
-            
-        if info[2] != filedata[2] or first:
-            info[2] = filedata[2] #enemies
-            _lcd.clear()
-            _lcd.message('Score: {}\nEnemies: {}'.format(info[1],info[2]))
-        
-        first = False
-        time.sleep(3)
+        if len(filedata)==3:
+            #print('Info 0: {}'.format(filedata[2]))
+            if info[0] != filedata[0]:
+                info[0] = filedata[0] #life
+                waitme = 0.1
+                if info[0] == '3':
+                    life = 3
+                    time.sleep(waitme)
+                    sendMsg('c-')
+                    time.sleep(waitme)
+                    sendMsg('l-','123')
+                    time.sleep(waitme)
+                elif info[0] == '2':
+                    life = 2
+                    time.sleep(waitme)
+                    sendMsg('c-')
+                    time.sleep(waitme)
+                    sendMsg('l-','23')
+                    time.sleep(waitme)
+                elif info[0] == '1':
+                    life = 1
+                    time.sleep(waitme)
+                    sendMsg('c-')
+                    time.sleep(waitme)
+                    sendMsg('l-','3')
+                    time.sleep(waitme)
+                elif info[0] == '0':
+                    life = 0
+                    time.sleep(waitme)
+                    sendMsg('c-')
+                    time.sleep(waitme)
+                    sendMsg('t-')
+                    time.sleep(0.7)                
+            if info[1] != filedata[1]:
+                info[1] = filedata[1] #score
+            if info[2] != filedata[2]:
+                info[2] = filedata[2] #enemies
+            #print('Score: {}\nEnemies: {}'.format(info[1],info[2]))
+    
         temp = psutil.sensors_temperatures()
         temp = temp['cpu-thermal']
         temp = temp[0]
@@ -116,17 +144,18 @@ def readTemp():
         elif temp<maxTemp and fan==True:
             GPIO.output(21, GPIO.LOW)
             fan = False
-        print('CPU Temp: {}'.format(temp))
+        #print('CPU Temp: {}'.format(temp))
+        _lcd.clear()
+        if life:
+            _lcd.message('Life: {}  T:{}\nEnemies: {}'.format(life,temp,info[2]))
+        else:
+            _lcd.message('Game Over\nYour Score: {}'.format(info[1]))
         sendMsg('p-','')
+        time.sleep(2)
+        
     _TEMP = False    
     fan = False
-    #print('Stop Temp Loop')
-    
-
-def sendMsg(prefix='s-', mess='', suffix=''):
-    mess = str(prefix) + str(mess) + str(suffix)
-    ser.write(mess.encode("UTF-8")) # on rpi
-    
+    print('Stop Temp Loop')
 
 def main():
     GPIO.setmode(GPIO.BCM)
@@ -147,7 +176,8 @@ def main():
     menuInput = ''
     while menuInput!='exit':
         print()
-        print("1. Send test message.\n0. Exit")
+        #print("1. Send test message.\n0. Exit")
+        print("0. Exit")
         try:
             menuInput = int(input())
         except:
@@ -164,9 +194,10 @@ def main():
             menuInput = 'exit'
 
         # Pin test
-        if menuInput == 1:   
+        '''
+         menuInput == 1:   
             sendMsg('t-')
-
+        '''
     GPIO.output(21, GPIO.LOW)
     print('App closed.')
     _lcd.clear()

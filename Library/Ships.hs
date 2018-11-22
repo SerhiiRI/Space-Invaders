@@ -36,7 +36,7 @@ defaultUserSprite       = (length(head defaultUserShip), length(defaultUserShip)
 defaultBulletView       :: [String]
 defaultBulletView       = ["^","!"," "]
 defaultShip             :: [String]
-defaultShip             = [" /^\\ ", " \\^/ "]
+defaultShip             = [" /^\\ "]--, " \\^/ "]
 defaultEnemySprite      :: (Width, Height)
 defaultEnemySprite      = (length(head defaultShip), length(defaultShip))
 
@@ -66,7 +66,7 @@ data Ship = Ship { point :: Point
 -- TODO: create offset to dimension enemymatrix
 createEnemyShipTemplate :: Offset -> Dimension -> [[Maybe Ship]]
 createEnemyShipTemplate offsetByY dimension = do
-  let enemyMatrix = replicate 4 $ replicate 10 (Ship {
+  let enemyMatrix = replicate 3 $ replicate 10 (Ship {
                                  point          = Point 0 0
                                  , viewShip     = defaultShip
                                  , shipSprite   = defaultEnemySprite
@@ -129,7 +129,7 @@ intersectBulletSprite yOffset enemy@(Ship {bullets=(blt:bltsls)}) ship currentBu
     inSection :: Point -> (Int, Int) -> Point -> Bool
     inSection (Point shipX shipY) (shipWidth, shipHeight) (Point bulletX bulletY) =
       and ([
-              and [shipY < yOffset bulletY, (shipY+shipHeight) > yOffset bulletY],
+              and [shipY <= yOffset bulletY, (shipY+shipHeight) > yOffset bulletY],
               and [shipX < bulletX, (shipX+shipWidth) > bulletX]
            ])
 
@@ -198,12 +198,15 @@ renderShipM (Nothing) = putStr ""
 renderShipM (Just (Ship {point=(Point x_position y_position), viewShip=[]})) = ANSI.setCursorPosition y_position x_position
 renderShipM (Just ship@(Ship { point=(Point x_position y_position), viewShip=(l:ls) })) = do
   ANSI.setCursorPosition y_position x_position
-  putStr l
+  colorize l Red
+  -- putStr l
   renderShipM (Just (ship {point=(Point x_position (y_position+1)), viewShip=ls}))
 
 addBulletStack :: Ship -> Maybe Ship
 addBulletStack ship@(Ship {point=(Point xloc yloc), shipSprite=(spriteW,spriteH), bullets=bulletList }) =
-  Just (ship {bullets=(newBulletPoint : bulletList)})
+  if ((length bulletList) > 3)
+  then (Just ship)
+  else Just (ship {bullets=(newBulletPoint : bulletList)})
   where
     newBulletPoint = Bullet (Point ((div spriteW 2) + xloc) (yloc))
 
@@ -245,10 +248,10 @@ renderLifeCountM (Just ship@(Ship {lifes=countLifes})) terminalWindowsDimension 
   ANSI.setCursorPosition 1 ((subtract 15) (width terminalWindowsDimension))
   putStr $ "Lifies: " ++ (show $ countLifes)
 
-colorize :: String -> IO ()
-colorize text = do
-  setSGR [SetColor Foreground Vivid Red]
-  setSGR [SetColor Background Vivid Blue]
+colorize :: String -> Color -> IO ()
+colorize text color = do
+  setSGR [SetColor Foreground Vivid color]
+  --setSGR [SetColor Background Vivid Blue]
   putStr text
   setSGR [Reset]
 
@@ -263,6 +266,7 @@ runAndCleanBullet f func fpredicate ship@(Ship {bullets=bulletsList}) = Just shi
       | (f /= 0) = (Bullet {getBullet=(Point {x=nx, y=(ny)})}) : newBulletsList
       | (fpredicate ny) = (Bullet {getBullet=(Point {x=nx, y=(func ny)})}) : newBulletsList
       | otherwise = (newBulletsList)
+
 
 
 

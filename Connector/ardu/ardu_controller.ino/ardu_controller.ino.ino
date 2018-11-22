@@ -1,8 +1,8 @@
 int btn[3] = {2,3,4}; // pin for buttons
 int led[3] = {5,6,7}; // pin of led
-String key[] = {"a", "d", " "}; //ASCII symbol for buttons
+String key[] = {"a", "d", "j","-"}; //ASCII symbol for buttons
 String serialRead="";
-bool info[] = {false, false};
+bool info[] = {false, false, false};
 bool quit = false;
 int cor = 0;
 int sensor[] = {0, 0};
@@ -74,7 +74,8 @@ void ReadMessage(){
     if(tmp == "l-"){caseme = 1;}else
     if(tmp == "b-"){caseme = 2;}else
     if(tmp == "t-"){caseme = 3;}else
-    if(tmp == "p-"){caseme = 4;}
+    if(tmp == "p-"){caseme = 4;}else
+    if(tmp == "c-"){caseme = 5;}
     switch (caseme) {
       case 1:
           Serial.println("Change led stat.");
@@ -108,6 +109,9 @@ void ReadMessage(){
           sensor[1] = analogRead(sensor[0]);//Value of sensor get read from sensor pin 0
           Serial.println("s-" + String(sensor[1]));
         break;
+      case 5:
+          reset();
+        break;
       default:
           Serial.println("WTF is this? I don't get it.");
         break;
@@ -135,14 +139,15 @@ void pressBtn(int x){
     //BtnPressTest(led[x]);
     Serial.println("b-" + String(key[x])); // b- send button syntax
     delay(50);
-    Serial.println("b-"); // b- send button syntax
+    //Serial.println("b-$"); // b- send button syntax
 }
 
 // Used to read button and send emulated keboard key.
 void ReadKeyboard(){
-  if(digitalRead(btn[0])==0)pressBtn(0);
-  if(digitalRead(btn[1])==0)pressBtn(1);
-  if(digitalRead(btn[2])==0)pressBtn(2);
+  if(digitalRead(btn[0])==0){pressBtn(0); info[2]=true;}
+  else if(digitalRead(btn[1])==0){pressBtn(1); info[2]=true;}
+  else if(digitalRead(btn[2])==0){pressBtn(2); info[2]=true;}
+  else{if(info[2]){pressBtn(3); info[2]=false;}}
 }
 
 //Reset to default set
