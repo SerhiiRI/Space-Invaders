@@ -173,8 +173,8 @@ menu = do
   Vector.textIntro (center window)
   controlKey <- getChar
   if | controlKey `elem` ['a', 'A'] -> Vector.clearScreenToBegin (Vector.height windowDimension, Vector.width windowDimension) >> catch (level startSettings) handler >> main
-     | controlKey `elem` ['d', 'D'] -> changeGameStatus >> exit
-     | otherwise -> main
+     | controlKey `elem` ['d', 'D'] -> changeGameStatus >> catch exit handler
+     | otherwise -> catch main handler
   exit
   where
     changeGameStatus :: IO ()
@@ -217,7 +217,4 @@ finishGame message _SETTING = do
   putStrLn ""
   where
   center :: Vector.Dimension -> (Vector.X, Vector.Y)
-  center wind =((((Vector.width wind) `div` 2)  -  (div 16 2 )), (((Vector.height wind) `div` 2)  -  (div 10 2 )))
-  
-
-
+  center wind =((((Vector.width wind) `div` 2)  -  (div 18 2 )), (((Vector.height wind) `div` 2)  -  (div 10 2 ) -5))

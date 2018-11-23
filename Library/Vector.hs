@@ -39,21 +39,25 @@ clearScreenToBegin (x, y) = ANSI.setCursorPosition x y >> ANSI.clearFromCursorTo
 textFinish :: (X, Y) -> String -> IO ()
 textFinish (xpoint, ypoint) message = do
   let defaultUserShip = []
-        ++ ["     /#\\     "]
-        ++ ["  \\ / | \\ /  "]
-        ++ ["  /\\\\ | //\\  "]
-        ++ ["     - -     " ]
-  let bueno = ["Bu-u-u-ueno-o!"]
+        ++ ["       /#\\       "]
+        ++ ["    \\ / | \\ /    "]
+        ++ ["    /\\\\ | //\\    "]
+        ++ ["       - -       "]
+  let bueno = ["--{ Press any key }--"]
+  let nmsg  = ["--{ "++message++" }--"]
+  let end =    ["--{ EOF }--"]
   let _000L = 0
-  let _001L = (+) (length defaultUserShip) 2
+  let _001L = (+) (length defaultUserShip) 6
   let _002L = (+) _001L 2
-
+  let _003L = (+) _002L 2
   let _000H = 0
-  let _001H = (div (length $ head defaultUserShip) 2) - (div (length message) 2) -1
-  let _002H = (div (length $ head defaultUserShip) 2) - (div (length bueno) 2) -1
-  drowing   ANSI.Red         _000H       _000L      defaultUserShip
-  drowing   ANSI.White       _001H       _001L      [message]
+  let _001H = (div (length $ head defaultUserShip) 2) - (div (length $ head nmsg) 2)
+  let _002H = (div (length $ head defaultUserShip) 2) - (div (length $ head bueno) 2)
+  let _003H = (div (length $ head defaultUserShip) 2) - (div (length $ head end) 2)
+  drowing   ANSI.Cyan        _000H       _000L      defaultUserShip
+  drowing   ANSI.White       _001H       _001L      nmsg
   drowing   ANSI.White       _002H       _002L      bueno
+  drowing   ANSI.White       _003H       _003L      end
   where
     drowing :: ANSI.Color -> X -> Y -> [String] -> IO ()
     drowing color offsetX offsetY [] = putStr ""
