@@ -6,6 +6,7 @@ module Library.Vector
   , parseWindow
   , clearScreenToBegin
   , textIntro
+  , textFinish
   , isCompatibleWindow
 )where
 import qualified System.Console.ANSI as ANSI
@@ -35,10 +36,37 @@ clearScreenToBegin (0, 0) = putStr ""
 clearScreenToBegin (x, y) = ANSI.setCursorPosition x y >> ANSI.clearFromCursorToScreenBeginning
 
 
--- textFinal :: (X, Y) -> String -> IO ()
--- textFinal (xpoint, ypoint) message = do
---   let ship = []
---         ++ 
+textFinish :: (X, Y) -> String -> IO ()
+textFinish (xpoint, ypoint) message = do
+  let defaultUserShip = []
+        ++ ["     /#\\     "]
+        ++ ["  \\ / | \\ /  "]
+        ++ ["  /\\\\ | //\\  "]
+        ++ ["     - -     " ]
+  let bueno = ["Bu-u-u-ueno-o!"]
+  let _000L = 0
+  let _001L = (+) (length defaultUserShip) 2
+  let _002L = (+) _001L 2
+
+  let _000H = 0
+  let _001H = (div (length $ head defaultUserShip) 2) - (div (length message) 2) -1
+  let _002H = (div (length $ head defaultUserShip) 2) - (div (length bueno) 2) -1
+  drowing   ANSI.Red         _000H       _000L      defaultUserShip
+  drowing   ANSI.White       _001H       _001L      [message]
+  drowing   ANSI.White       _002H       _002L      bueno
+  where
+    drowing :: ANSI.Color -> X -> Y -> [String] -> IO ()
+    drowing color offsetX offsetY [] = putStr ""
+    drowing color offsetX offsetY (str:strings)= do
+      ANSI.setCursorPosition (ypoint+offsetY) (xpoint+offsetX)
+      colorize str color
+      drowing color offsetX (offsetY+1) strings
+    colorize :: String -> ANSI.Color -> IO ()
+    colorize text color = do
+      ANSI.setSGR [ANSI.SetColor ANSI.Foreground ANSI.Vivid color]
+      putStr text
+      ANSI.setSGR [ANSI.Reset]
+
 
 textIntro :: (X, Y) -> IO ()
 textIntro (xpoint, ypoint) = do

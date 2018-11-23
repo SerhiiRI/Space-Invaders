@@ -149,12 +149,6 @@ level startUpSetting = do
       = (Vector.Point ((xwidth `div` 2)-10) (xheight - (xheight `div` 6)))
 
 menu = do
-  -- arg <- getArgs
-  -- if (length arg < 3) then exitSuccess
-  --   else putStr ""
-  -- let fileLifes         = arg !! 0
-  -- let fileBright        = arg !! 1
-  -- let fileKey           = arg !! 2
   let fileDATA          = "./DATA"
   let fileBright        = "./bright"
   let fileKey           = "./key"
@@ -162,6 +156,7 @@ menu = do
   old <-hGetEcho stdin
   hSetEcho stdin False
   windowDimension        <- Vector.parseWindow <$> size
+  if (Vector.isCompatibleWindow windowDimension) then putStr "" else exitSuccess 
   let startSettings = Setting { offset=(if ((Vector.height windowDimension) > (Vector.width windowDimension)) then 4 else 0)
                               , health=3
                               , score=0
@@ -178,10 +173,12 @@ menu = do
   Vector.textIntro (center window)
   controlKey <- getChar
   if | controlKey `elem` ['a', 'A'] -> Vector.clearScreenToBegin (Vector.height windowDimension, Vector.width windowDimension) >> catch (level startSettings) handler >> main
-     | controlKey `elem` ['d', 'D'] -> exit
+     | controlKey `elem` ['d', 'D'] -> changeGameStatus >> exit
      | otherwise -> main
   exit
   where
+    changeGameStatus :: IO ()
+    changeGameStatus = writeFile "./gamestatus" "0"
     handler :: SomeException -> IO ()
     handler e = putStrLn $ ANSI.showCursorCode
     center :: Vector.Dimension -> (Vector.X, Vector.Y)
@@ -201,7 +198,10 @@ exit = do
   ANSI.setCursorPosition 0 0
   ANSI.setSGR [ANSI.Reset]
 
-main = catch menu handler
+main = do
+  hSetBuffering stdout NoBuffering
+  hSetBuffering stdin NoBuffering
+  catch menu handler
   where
     handler :: SomeException -> IO ()
     handler _ = exit
@@ -210,13 +210,14 @@ finishGame :: String -> Setting -> IO ()
 finishGame message _SETTING = do
   putStr ANSI.clearFromCursorToScreenBeginningCode
   putStr ANSI.clearFromCursorToScreenEndCode
+  ANSI.setCursorPosition 0 0
   window <- Vector.parseWindow <$> size
-  ANSI.setCursorPosition ((Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
-  putStrLn message
-  ANSI.setCursorPosition ((+) 1 $ (Vector.height window) `div` 2) (((Vector.width window) `div` 2)  -  (div (length message) 2))
-  putStrLn $ "Score: " ++ (show $ score _SETTING)
+  Vector.textFinish (center window) ( "Score: " ++ (show $ score _SETTING))
   _ <- getChar
   putStrLn ""
+  where
+  center :: Vector.Dimension -> (Vector.X, Vector.Y)
+  center wind =((((Vector.width wind) `div` 2)  -  (div 16 2 )), (((Vector.height wind) `div` 2)  -  (div 10 2 )))
   
 
 

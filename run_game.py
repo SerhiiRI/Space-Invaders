@@ -14,6 +14,11 @@ import subprocess
 _PROCESS=True #if True then multiprocessing run
 _LISTENING = True #Listening serial port
 _TEMP=True #Get update cpu temperature
+_pool1 = ThreadPool(processes=1)
+_pool2 = ThreadPool(processes=2)
+_menuInput = ''
+_WINID = ''
+
 # Raspberry Pi pin configuration:
 lcd_rs        = 25#= 22  # Note this might need to be changed to 21 for older revision Pi's.
 lcd_en        = 24#= 18
@@ -32,16 +37,40 @@ _lcd = LCD.Adafruit_CharLCD(lcd_rs, lcd_en, lcd_d4, lcd_d5, lcd_d6, lcd_d7,
                                lcd_columns, lcd_rows, lcd_backlight)
     
 
-
 def sendMsg(prefix='s-', mess='', suffix=''):
     mess = str(prefix) + str(mess) + str(suffix)
     ser.write(mess.encode("UTF-8")) # on rpi
     #print('>{}'.format(mess))
     
 
-def readArdu():
-    global _LISTENING
+def quitapp():
     global _PROCESS
+    global _LISTENING
+    global _TEMP
+    global _pool1
+    global _pool2
+    global _menuInput    
+    sendMsg('','@','')
+    _PROCESS = False
+    while _LISTENING and _TEMP:
+        print('>>Wait for close pool.')
+        time.sleep(1)
+    _pool1.terminate()
+    _pool1.join()
+    _pool2.terminate()
+    _pool2.join()
+    ser.close()
+    print('Closing app')
+    _menuInput = 'exit'
+
+
+def readArdu():
+    global _PROCESS
+    global _LISTENING
+    global _TEMP
+    global _pool1
+    global _pool2
+    global _menuInput  
     #global _keyboard
     tmpKey =''
     tmpBright = ''
@@ -66,13 +95,6 @@ def readArdu():
                     elif(mode=='b-'):
                         #print('>>Key: {}'.format(data[2]))
                         try:
-                            '''
-                            if tmpKey != data[2]:
-                                tmpKey = data[2]
-                                #open('key','w').write(data[2])
-                               '''
-                            #_keyboard.press(data[2])
-                            #_keyboard.release(data[2])
                             os.system('xdotool key {}'.format(data[2]))
                         except:
                             print('Press faild')
@@ -82,14 +104,17 @@ def readArdu():
         
     _LISTENING = False
     print('Stop Listening')
-    ser.close()
     
     
 def readTemp():
-    global _lcd
-    global _TEMP
     global _PROCESS
+    global _LISTENING
+    global _TEMP
+    global _pool1
+    global _pool2
+    global _menuInput  
     global _lcd
+    global _WINID
     fan = False
     life = 0
     maxTemp = 50
@@ -101,48 +126,52 @@ def readTemp():
     while _PROCESS:
         try:
             filedata = open('DATA').read()
-            '''
-            if open('gamestatus').read() == '0':
+            quitme = open('gamestatus').read()
+            if quitme[0] == '0':
+                print(">>Game quit.")
+                os.system('xdotool key ctrl+c')
+                os.system('xdotool type \'exit\'')
+                os.system('xdotool key Return')
+                os.system('xdotool windowactivate {}'.format(_WINID))
                 os.system('xdotool key 0')
                 os.system('xdotool key Return')
-                '''
         except:
             filedata = '0;0;0'
-        
+                    
         filedata = filedata.split(';')
         if len(filedata)==3:
             #print('Info 0: {}'.format(filedata[2]))
-            if info[0] != filedata[0]:
-                info[0] = filedata[0] #life
-                waitme = 0.1
-                if info[0] == '3':
-                    life = 3
-                    time.sleep(waitme)
-                    sendMsg('c-')
-                    time.sleep(waitme)
-                    sendMsg('l-','123')
-                    time.sleep(waitme)
-                elif info[0] == '2':
-                    life = 2
-                    time.sleep(waitme)
-                    sendMsg('c-')
-                    time.sleep(waitme)
-                    sendMsg('l-','23')
-                    time.sleep(waitme)
-                elif info[0] == '1':
-                    life = 1
-                    time.sleep(waitme)
-                    sendMsg('c-')
-                    time.sleep(waitme)
-                    sendMsg('l-','3')
-                    time.sleep(waitme)
-                elif info[0] == '0':
-                    life = 0
-                    time.sleep(waitme)
-                    sendMsg('c-')
-                    time.sleep(waitme)
-                    sendMsg('t-')
-                    time.sleep(0.7)                
+            #if info[0] != filedata[0]:
+            info[0] = filedata[0] #life
+            waitme = 0.1
+            if info[0] == '3':
+                life = 3
+                time.sleep(waitme)
+                sendMsg('c-')
+                time.sleep(waitme)
+                sendMsg('l-','123')
+                time.sleep(waitme)
+            elif info[0] == '2':
+                life = 2
+                time.sleep(waitme)
+                sendMsg('c-')
+                time.sleep(waitme)
+                sendMsg('l-','23')
+                time.sleep(waitme)
+            elif info[0] == '1':
+                life = 1
+                time.sleep(waitme)
+                sendMsg('c-')
+                time.sleep(waitme)
+                sendMsg('l-','3')
+                time.sleep(waitme)
+            elif info[0] == '0':
+                life = 0
+                time.sleep(waitme)
+                sendMsg('c-')
+                time.sleep(waitme)
+                sendMsg('t-')
+                time.sleep(0.7)                
             if info[1] != filedata[1]:
                 info[1] = filedata[1] #score
             if info[2] != filedata[2]:
@@ -168,13 +197,20 @@ def readTemp():
             _lcd.message('Game Over\nYour Score: {}'.format(info[1]))
             time.sleep(5)
         sendMsg('p-','')
-        time.sleep(2)
+        time.sleep(0.5)
         
     _TEMP = False    
     fan = False
     print('Stop Temp Loop')
 
 def main():
+    open('gamestatus','w').write('1')
+    id_cmd='xdotool getactivewindow'
+    id_cmd = subprocess.run(id_cmd.split(' '), stdout=subprocess.PIPE)
+    id_cmd = str(id_cmd.stdout)
+    global _WINID
+    _WINID = id_cmd[2:-3] #Window id
+    
     GPIO.setmode(GPIO.BCM)
     GPIO.setup(21, GPIO.OUT)
     GPIO.output(21, GPIO.LOW)
@@ -182,10 +218,12 @@ def main():
     global _PROCESS
     global _LISTENING
     global _TEMP
-    pool1 = ThreadPool(processes=1)
-    pool2 = ThreadPool(processes=2)
-    pool1.apply_async(readArdu)
-    pool2.apply_async(readTemp)
+    global _pool1
+    global _pool2
+    global _menuInput
+    
+    _pool1.apply_async(readArdu)
+    _pool2.apply_async(readTemp)
     
     os.system('xdotool key ctrl+alt+t')
     time.sleep(1)
@@ -194,34 +232,25 @@ def main():
     os.system('xdotool key Return')
     os.system('xdotool type \'python3 si_run.py\'')
     os.system('xdotool key Return')
-    open('gamestatus','w').write('1')
     
     _lcd.clear()
     _lcd.message('Run the game!')
     
-    menuInput = ''
-    while menuInput!='exit':
+    while _menuInput!='exit':
         print()
         #print("1. Send test message.\n0. Exit")
         print("0. Exit")
         try:
-            menuInput = int(input())
+            _menuInput = int(input())
         except:
             print('-')
         # Close app
-        if menuInput == 0:
-            sendMsg('','@','')
-            _PROCESS = False
-            pool1.terminate()
-            pool1.join()
-            pool2.terminate()
-            pool2.join()
-            print('Closing app')
-            menuInput = 'exit'
+        if _menuInput == 0:
+            quitapp()
 
         # Pin test
         '''
-         menuInput == 1:   
+         _menuInput == 1:   
             sendMsg('t-')
         '''
     GPIO.output(21, GPIO.LOW)
