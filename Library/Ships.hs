@@ -20,7 +20,6 @@ module Library.Ships
   , createEnemyShipTemplate
   , renderAllEnemyShips
   , intersectEnemyShips
-  -- to deprecate
   , killing
   ) where
 
@@ -97,7 +96,7 @@ addBulletOnEnemyStack :: Bool -> StdGen -> [Maybe Ship] -> [Maybe Ship]
 addBulletOnEnemyStack False rGen enemyMatrix = enemyMatrix
 addBulletOnEnemyStack True rGen enemyMatrix = do
   let (rv, _)  = randomR (0, (length enemyMatrix)-1) rGen
-  let (tright, (x:xs)) = splitAt rv enemyMatrix in (tright ++ [ x >>= addBulletStack ] ++ xs)
+  let (tright, (x:xs)) = splitAt rv enemyMatrix; bltlist =(tright ++ [ x >>= addBulletStack ] ++ xs); in (seq bltlist bltlist)
 
 
 
@@ -160,7 +159,7 @@ moveEnemyShips moveLRFunc moveDownFunc True shipsList = map (
   \maybeShip -> case maybeShip of
                   (Nothing) -> Nothing
                   (Just ship@(Ship {point=(Point xp yp)}))
-                    -> Just ship {point=(Point (moveLRFunc xp) (moveDownFunc yp))}) shipsList
+                    -> let xoff = moveLRFunc xp; yoff= moveDownFunc yp; in  Just ship {point=(Point (seq xoff xoff) (seq yoff yoff))}) shipsList
 
 getShipsLimitersPoint :: [Maybe Ship] -> (Int, Int)
 getShipsLimitersPoint [] = (0, 0)
@@ -261,7 +260,6 @@ renderLifeCountM (Just ship@(Ship {lifes=countLifes})) terminalWindowsDimension 
 colorize :: String -> Color -> IO ()
 colorize text color = do
   setSGR [SetColor Foreground Vivid color]
-  --setSGR [SetColor Background Vivid Blue]
   putStr text
   setSGR [Reset]
 
@@ -272,5 +270,5 @@ runAndCleanBullet f func fpredicate ship@(Ship {bullets=bulletsList}) = Just shi
   where
     cleanAndMove (Bullet (Point nx ny)) newBulletsList
       | (f /= 0) = (Bullet {getBullet=(Point {x=nx, y=(ny)})}) : newBulletsList
-      | (fpredicate ny) = (Bullet {getBullet=(Point {x=nx, y=(func ny)})}) : newBulletsList
+      | (fpredicate ny) = let vector = func ny in (Bullet {getBullet=(Point {x=nx, y=(seq vector vector)})}) : newBulletsList
       | otherwise = (newBulletsList)

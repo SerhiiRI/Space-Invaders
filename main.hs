@@ -23,11 +23,11 @@ data Setting = Setting { health :: Int
                        , file_key       :: FilePath
                        } deriving (Show)
 
-data LoopSetting = LoopSetting { counter    :: Int
-                               , cospi      :: Float
-                               , animSTG    :: Int
-                               , track      :: Int
-                               , down       :: Int
+data LoopSetting = LoopSetting { counter    :: !Int
+                               , cospi      :: !Float
+                               , animSTG    :: !Int
+                               , track      :: !Int
+                               , down       :: !Int
                                } deriving (Show)
 
 ifReadyDo :: Handle -> IO a -> IO (Maybe a)
@@ -67,11 +67,6 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
   rescanWindowsDimension        <- Vector.parseWindow <$> size
   ANSI.setCursorPosition 0 0
   hFlush stdout
-  -- file <- openFile (file_key _SETTING) ReadMode
-  -- result <- try (ifReadyDo' file hGetChar):: IO (Either IOException (Maybe Char) )
-  -- let charM = case result of
-  --        (Left val) -> Nothing
-  --        (Right val) -> val
 
   charM <- ifReadyDo stdin getChar
   let (randomValue, newRandomGenerator) = Random.randomR (1, 1000) randomGenerator :: (Int, Random.StdGen)
