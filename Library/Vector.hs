@@ -2,7 +2,7 @@ module Library.Vector
   ( Point(..)
   , Dimension(..)
   , X
-  , Y  
+  , Y
   , parseWindow
   , clearScreenToBegin
   , textIntro
@@ -96,7 +96,7 @@ textIntro (xpoint, ypoint) = do
   let p3 =              ["          --{ EOF }--            "]
   let _000L   = 0
   let _001L   = length space
-  let _002L   = (+) (_001L + 2) $ length invaders 
+  let _002L   = (+) (_001L + 2) $ length invaders
   let _003L   = (+) _002L 1
   let _004L   = (+) _003L 1
   -- real menu
@@ -105,7 +105,7 @@ textIntro (xpoint, ypoint) = do
   let _006L   = (+) _005L 2
   let _007L   = (+) _006L 2
   let _001H   = (length $ head invaders) - (length $ head authorA) -1
-  let _002H   = (div (length $ head invaders) 2) - (div (length $ head p1) 2) 
+  let _002H   = (div (length $ head invaders) 2) - (div (length $ head p1) 2)
   drowing   ANSI.Red         6       _000L      space
   drowing   ANSI.Cyan        0       _001L      invaders
   drowing   ANSI.Red         _001H   _002L      by

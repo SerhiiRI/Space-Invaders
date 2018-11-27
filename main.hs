@@ -28,6 +28,7 @@ data LoopSetting = LoopSetting { counter    :: !Int
                                , animSTG    :: !Int
                                , track      :: !Int
                                , down       :: !Int
+                               , gcolor     :: !ANSI.Color
                                } deriving (Show)
 
 ifReadyDo :: Handle -> IO a -> IO (Maybe a)
@@ -61,13 +62,13 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
   let windowDimension           = window        _SETTING
   let randomGenerator           = rndgen        _SETTING
   let newAnimSTG                = if ((mod iterator 8) /= 0) then animSTG _LOOP else (+) 1 $ animSTG _LOOP
-  key   <- readFile  (file_key  _SETTING)
-  colorEnemies <- ((readFile (file_bright _SETTING)) >>= \x -> return $ if ((read x) == 0) then ANSI.Red else ANSI.Cyan)
+  colorEnemies <- if (mod iterator 7000 /= 0)
+                  then return (gcolor _LOOP)
+                  else ((readFile (file_bright _SETTING)) >>= \x -> return $ if ((read x) == 0) then ANSI.Red else ANSI.Cyan)
 
   rescanWindowsDimension        <- Vector.parseWindow <$> size
   ANSI.setCursorPosition 0 0
   hFlush stdout
-
   charM <- ifReadyDo stdin getChar
   let (randomValue, newRandomGenerator) = Random.randomR (1, 1000) randomGenerator :: (Int, Random.StdGen)
   let nnewShip =
@@ -87,8 +88,6 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
            else (_PI, downOffset, Ships.moveEnemyShips (+ (round $ cos _PI)) (id) True ewEnemyShips)
         else (_PI, downOffset, ewEnemyShips)
   let (newShip, newEnemyShips, toEreasing)  = Ships.killing nnewEnemyShips nnewShip
-
-
   let colorGamer = if(newShip == userShip) then ANSI.Red else ANSI.Cyan
   if (newShip == userShip) then putStr "" else usleep 500
 
@@ -101,13 +100,15 @@ mainLoop _LOOP _SETTING userShip enemyShips = do
   Ships.renderEnemyBullets      newEnemyShips rescanWindowsDimension
   Ships.renderAllEnemyShips     colorEnemies (mod newAnimSTG animCount) newEnemyShips
 
-  writeFile  (file_DATA _SETTING) (
-    if (TMaybe.isJust newShip)
-    then (((show $ Ships.lifes $ TMaybe.fromJust newShip)
-                  ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))
-    else ((("0" ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))))
+  if(iterator == 0)
+    then (writeFile  (file_DATA _SETTING) (
+             if (TMaybe.isJust newShip)
+             then (((show $ Ships.lifes $ TMaybe.fromJust newShip)
+                    ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips)))
+             else ((("0" ++ ";" ++ (show $ score _SETTING) ++ ";" ++ (show $ length newEnemyShips))))))
+    else (ANSI.setCursorPosition 0 0)
 
-  let n_LOOP = _LOOP { down=new_down, cospi=new_PI, animSTG=newAnimSTG, counter=(if | iterator == 10000  -> 0 | otherwise -> iterator +1) }
+  let n_LOOP = _LOOP { down=new_down, cospi=new_PI, gcolor=colorEnemies, animSTG=newAnimSTG, counter=(if | iterator == 10000  -> 0 | otherwise -> iterator +1) }
   usleep 10000
   case () of
     _ | and [TMaybe.isJust newShip, not $ null newEnemyShips]-> (mainLoop n_LOOP (_SETTING {window=(rescanWindowsDimension), rndgen=newRandomGenerator}) newShip newEnemyShips)
@@ -136,6 +137,7 @@ level startUpSetting = do
                                 , cospi         = pi
                                 , animSTG       = 3
                                 , down          = 0
+                                , gcolor        = ANSI.Cyan
                                 , track         = (if ((Vector.height windowDimension) > (Vector.width windowDimension)) then 14 else 10) }
   let enemyMatrix               = concat $ Ships.createEnemyShipTemplate (offset startUpSetting) windowDimension
   mainLoop loopSetting startUpSetting userShips enemyMatrix
@@ -151,7 +153,7 @@ menu = do
   old <-hGetEcho stdin
   hSetEcho stdin False
   windowDimension        <- Vector.parseWindow <$> size
-  if (Vector.isCompatibleWindow windowDimension) then putStr "" else exitSuccess 
+  if (Vector.isCompatibleWindow windowDimension) then putStr "" else exitSuccess
   let startSettings = Setting { offset=(if ((Vector.height windowDimension) > (Vector.width windowDimension)) then 4 else 0)
                               , health=3
                               , score=0
